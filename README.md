@@ -116,6 +116,47 @@ Expected Phase 1 coverage after a successful ingest:
 
 No applicant personal data is collected in Phase 1, and no race or ethnicity field is present in the schema, seed data, or ingestion scripts.
 
+## Fit Finder Phase 1 - School Attributes and Embeddings
+
+Fit Finder Phase 1 enriches the existing `schools` table with public school attributes and pinned embeddings. It does not add `/api/fit`, applicant-facing UI, or runtime query embedding.
+
+The shared embedding constants live in `lib/fit/embedding-model.ts`:
+
+- `EMBEDDING_MODEL_ID`: `Xenova/all-MiniLM-L6-v2`
+- `EMBEDDING_DIM`: `384`
+
+The Python pipeline reads those constants from the TypeScript file so stored school vectors and future query vectors use the same model id and dimension.
+
+Apply the new migration after the original schools migration:
+
+```powershell
+supabase db push
+```
+
+Then run the enrichment pass:
+
+```powershell
+npm run fit:enrich
+```
+
+This fetches public College Scorecard fields for the checked-in seed schools, derives `program_areas`, `size_band`, `region`, `net_price_avg`, `sticker_cost`, `median_earnings_10yr`, and `completion_rate`, then upserts those nullable fields into `schools`.
+
+Build and store the school embeddings:
+
+```powershell
+npm run fit:embed
+```
+
+The embedding script builds deterministic school documents from public attributes only, embeds them with `Xenova/all-MiniLM-L6-v2`, and upserts `schools.embedding` as a `vector(384)` value.
+
+Run the sanity report after embeddings are stored:
+
+```powershell
+npm run fit:embedding-sanity
+```
+
+The report is written to `pipeline/reports/embedding_sanity.md` and compares known school pairs by cosine similarity. It is a smoke check for populated vectors, not an admissions quality claim.
+
 ## Phase 2 - Modeling
 
 Phase 2 trains a synthetic public-data prior model. It does not claim real-outcome accuracy. The default run uses the checked-in cache at `pipeline/data/schools_public_cache.csv`, which contains the same public school fields produced by the Phase 1 ingest plus the C7 seed overlays. You can also point the trainer at Supabase with `--source supabase` after filling `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.

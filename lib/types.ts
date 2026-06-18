@@ -6,6 +6,10 @@ export type SelectivityTier =
   | "selective"
   | "accessible";
 
+export type SchoolSizeBand = "small" | "medium" | "large";
+
+export type SchoolRegion = "Northeast" | "Midwest" | "South" | "West";
+
 export type C7Rating =
   | "Very Important"
   | "Important"
@@ -45,6 +49,14 @@ export type School = {
   rd_admit_rate: number | null;
   c7_factors: C7Factors | null;
   selectivity_tier: SelectivityTier | null;
+  program_areas: string[] | null;
+  size_band: SchoolSizeBand | null;
+  region: SchoolRegion | null;
+  net_price_avg: number | null;
+  sticker_cost: number | null;
+  median_earnings_10yr: number | null;
+  completion_rate: number | null;
+  embedding: number[] | null;
   updated_at: string;
 };
 
@@ -110,9 +122,32 @@ export type Database = {
     Tables: {
       schools: {
         Row: School;
-        Insert: Omit<School, "updated_at"> & {
+        Insert: Omit<
+          School,
+          | "updated_at"
+          | "program_areas"
+          | "size_band"
+          | "region"
+          | "net_price_avg"
+          | "sticker_cost"
+          | "median_earnings_10yr"
+          | "completion_rate"
+          | "embedding"
+        > & {
           updated_at?: string;
-        };
+        } & Partial<
+            Pick<
+              School,
+              | "program_areas"
+              | "size_band"
+              | "region"
+              | "net_price_avg"
+              | "sticker_cost"
+              | "median_earnings_10yr"
+              | "completion_rate"
+              | "embedding"
+            >
+          >;
         Update: Partial<Omit<School, "unitid">>;
         Relationships: [];
       };
