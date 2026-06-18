@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "train:real": "python pipeline/train_real.py",
+    "check:real-gate": "python pipeline/check_real_gate.py",
     "verify:rls": "node --conditions react-server --import tsx pipeline/verify_rls.ts"
   },
   "dependencies": {
