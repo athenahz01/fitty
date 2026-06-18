@@ -154,6 +154,33 @@ export default function MethodologyPage() {
               telling the truth about missing evidence.
             </p>
           </section>
+
+          <section className="method-panel limitation-panel">
+            <div className="section-kicker">Fit Finder</div>
+            <h3 className="section-title">Reasons plus ranges, never a fit score.</h3>
+            <p className="method-copy">
+              Fit Finder compares the student&apos;s stated interests and
+              preferences with each school&apos;s published attributes: programs,
+              size, setting, region, public outcomes, and published cost. It
+              uses text embeddings to find nearby school records, then attaches
+              the same honest chancing range Fitty uses elsewhere.
+            </p>
+            <ul className="method-list">
+              <li>
+                It cannot weigh campus culture, social fit, teaching quality,
+                vibe, or anything missing from public data.
+              </li>
+              <li>
+                Affordability uses published net price or sticker cost only.
+                Merit aid is not predicted, and a family&apos;s real cost can differ.
+              </li>
+              <li>
+                Fit is shown as matched reasons and notable attributes, not as a
+                score. Chances are calibrated ranges, not guarantees.
+              </li>
+              <li>Race and ethnicity are never used for matching or chances.</li>
+            </ul>
+          </section>
         </div>
 
         <section className="calibration-ledger" aria-labelledby="calibration-ledger">

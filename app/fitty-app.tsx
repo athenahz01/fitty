@@ -177,6 +177,8 @@ type FitExplanationState = {
   reason?: string;
 };
 
+type FitFinderStatus = "checking" | "enabled" | "disabled";
+
 const initialProfile: Profile = {
   gpa: "3.85",
   sat: "1480",
@@ -344,6 +346,8 @@ export function FittyApp() {
   const [schoolSearchError, setSchoolSearchError] = useState("");
   const [addedSchools, setAddedSchools] = useState<AddedSchool[]>([]);
   const [formNotice, setFormNotice] = useState("");
+  const [fitFinderStatus, setFitFinderStatus] =
+    useState<FitFinderStatus>("checking");
   const searchRequest = useRef(0);
 
   const profileErrors = useMemo(() => validateProfile(profile), [profile]);
@@ -354,6 +358,37 @@ export function FittyApp() {
   useEffect(() => {
     trackEvent("page_view", { path: "/" });
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadFitFinderStatus() {
+      try {
+        const response = await fetch("/api/fit/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setFitFinderStatus(payload?.enabled === true ? "enabled" : "disabled");
+      } catch {
+        if (active) {
+          setFitFinderStatus("disabled");
+        }
+      }
+    }
+
+    void loadFitFinderStatus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (fitFinderStatus === "enabled") {
+      trackEvent("fit_finder_viewed", { surface: "home" });
+    }
+  }, [fitFinderStatus]);
 
   useEffect(() => {
     const query = schoolQuery.trim();
@@ -577,14 +612,16 @@ export function FittyApp() {
           </aside>
 
           <section className="results-column" aria-label="School chance results">
-            <FitFinderPanel
-              profile={profile}
-              setProfile={setProfile}
-              profileErrors={profileErrors}
-              profileReady={hasProfileForFit(profile)}
-              onAddSchool={addSchool}
-              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
-            />
+            {fitFinderStatus === "enabled" ? (
+              <FitFinderPanel
+                profile={profile}
+                setProfile={setProfile}
+                profileErrors={profileErrors}
+                profileReady={hasProfileForFit(profile)}
+                onAddSchool={addSchool}
+                addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+              />
+            ) : null}
             {addedSchools.length === 0 ? (
               <EmptyState />
             ) : (
@@ -904,6 +941,13 @@ function FitFinderPanel({
       const nextResponse = payload as FitResponse;
       setFitResponse(nextResponse);
       setStatus("ready");
+      trackEvent("fit_search_run", {
+        result_count: nextResponse.results.length,
+        has_region_filter: Boolean(preferences.preferredRegion),
+        has_size_filter: Boolean(preferences.preferredSize),
+        has_setting_filter: Boolean(preferences.preferredSetting),
+        has_affordability_filter: Boolean(preferences.costCeiling.trim()),
+      });
       void loadExplanations(nextResponse.results, requestId);
     } catch (fitError) {
       setStatus("error");
@@ -1143,6 +1187,7 @@ function FitFinderResults({
           explanation={explanations[result.school.unitid]}
           onAddSchool={onAddSchool}
           alreadyAdded={addedUnitids.includes(result.school.unitid)}
+          resultCount={response.results.length}
         />
       ))}
       <FitDisclaimers disclaimers={response.disclaimers} />
@@ -1175,11 +1220,13 @@ function FitResultCard({
   explanation,
   onAddSchool,
   alreadyAdded,
+  resultCount,
 }: {
   result: FitResult;
   explanation?: FitExplanationState;
   onAddSchool: (school: SchoolSearchRow) => void;
   alreadyAdded: boolean;
+  resultCount: number;
 }) {
   const schoolForList: SchoolSearchRow = {
     unitid: result.school.unitid,
@@ -1192,6 +1239,14 @@ function FitResultCard({
     act_75: null,
     test_policy: null,
   };
+
+  function handleAddSchool() {
+    trackEvent("fit_school_added", {
+      result_count: resultCount,
+      surface: "fit_finder",
+    });
+    onAddSchool(schoolForList);
+  }
 
   return (
     <article className="fit-result-card" data-testid="fit-result-card">
@@ -1208,7 +1263,7 @@ function FitResultCard({
           className="capture-secondary"
           type="button"
           disabled={alreadyAdded}
-          onClick={() => onAddSchool(schoolForList)}
+          onClick={handleAddSchool}
         >
           <Plus size={16} />
           {alreadyAdded ? "Added" : "Add to my Fitty list"}

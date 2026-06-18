@@ -244,6 +244,12 @@ The route pulls a candidate pool, computes each candidate's chance by calling `b
 
 Fit Finder now appears as a `Find schools` panel on the main Almanac page. It reuses the student profile already entered in the left column for GPA, SAT, ACT, and application round, then collects fit preferences: interests, intended major, preferred size, setting, region, published cost ceiling, and learning notes.
 
+Fit Finder is dark by default. Set this server flag only after the target Supabase project has Phase 1 enrichment and embeddings:
+
+```dotenv
+FITTY_FIT_FINDER_ENABLED=true
+```
+
 Run locally:
 
 ```powershell
@@ -260,6 +266,8 @@ ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 ```
 
 If `ANTHROPIC_API_KEY` is missing or the call fails, `POST /api/fit/explain` returns a fallback flag and the card remains usable with structured reasons only. The explanation prompt is constrained to use only the provided school attributes, matched reasons, and range band. It cannot use outside facts, rankings, unprovided programs, or a single admit number.
+
+With analytics debug enabled, Fit Finder emits only non-identifying events: viewed, search run, and school added. It records booleans for which filters were used and result counts. It does not record preference text, intended major, scores, GPA, costs, school identifiers, names, or state.
 
 ## Phase 2 - Modeling
 

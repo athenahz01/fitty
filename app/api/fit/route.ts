@@ -10,11 +10,16 @@ import {
   type FitSchoolCandidate,
 } from "@/lib/fit/matching";
 import { fitRequestSchema, formatValidationError } from "@/lib/fit/schema";
+import { fitFinderEnabled } from "@/lib/fit/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!fitFinderEnabled()) {
+    return NextResponse.json({ error: "Fit Finder is not enabled." }, { status: 404 });
+  }
+
   let body: unknown;
 
   try {

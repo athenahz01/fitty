@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { fitFinderEnabled } from "@/lib/fit/server";
+
 export const runtime = "nodejs";
 
 const DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
@@ -93,6 +95,10 @@ function extractText(payload: unknown) {
 }
 
 export async function POST(request: Request) {
+  if (!fitFinderEnabled()) {
+    return NextResponse.json({ error: "Fit Finder is not enabled." }, { status: 404 });
+  }
+
   let body: unknown;
 
   try {

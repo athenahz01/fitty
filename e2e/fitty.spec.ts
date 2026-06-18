@@ -237,6 +237,15 @@ async function mockOutcomeStatus(page: Page, enabled: boolean) {
   });
 }
 
+async function mockFitStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/fit/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
 async function mockSupabaseAuth(page: Page) {
   const corsHeaders = {
     "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
@@ -370,6 +379,7 @@ test("keeps outcome capture closed when the server flag is disabled", async ({
   let captureRequests = 0;
 
   await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
   await page.route(
     /\/api\/outcomes\/(consent|profile|application|export-my-data|revoke-consent|delete-my-data)$/,
     async (route) => {
@@ -388,12 +398,48 @@ test("keeps outcome capture closed when the server flag is disabled", async ({
   expect(captureRequests).toBe(0);
 });
 
+test("keeps Fit Finder dark when the server flag is disabled", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await page.route("**/api/fit", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      status: 404,
+      body: JSON.stringify({ error: "Fit Finder is not enabled." }),
+    });
+  });
+  await page.route("**/api/fit/explain", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      status: 404,
+      body: JSON.stringify({ error: "Fit Finder is not enabled." }),
+    });
+  });
+
+  await page.goto("/");
+
+  await expect(page.getByTestId("fit-finder-panel")).toHaveCount(0);
+
+  const statuses = await page.evaluate(async () => {
+    const fit = await fetch("/api/fit", { method: "POST", body: "{}" });
+    const explain = await fetch("/api/fit/explain", {
+      method: "POST",
+      body: "{}",
+    });
+    return { fit: fit.status, explain: explain.status };
+  });
+  expect(statuses).toEqual({ fit: 404, explain: 404 });
+});
+
 test("records consent, profile, and one outcome through the enabled capture flow", async ({
   page,
 }) => {
   const captureBodies: Record<string, unknown> = {};
 
   await mockOutcomeStatus(page, true);
+  await mockFitStatus(page, false);
   await mockSupabaseAuth(page);
   await page.route(/\/api\/outcomes\/(consent|profile|application)$/, async (route) => {
     expect(route.request().headers().authorization).toBe(`Bearer ${testAccessToken}`);
@@ -514,6 +560,7 @@ test("exports, revokes, and deletes signed-in outcome data with confirmation", a
   let deleteRequests = 0;
 
   await mockOutcomeStatus(page, true);
+  await mockFitStatus(page, false);
   await mockSupabaseAuth(page);
   await page.route("**/api/outcomes/export-my-data", async (route) => {
     expect(route.request().method()).toBe("GET");
@@ -601,6 +648,7 @@ test("runs Fit Finder, renders grounded prose, and adds a school to the list", a
   let explainRequests = 0;
 
   await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, true);
   await mockFitFinder(page);
   await page.route("**/api/fit/explain", async (route) => {
     expect(route.request().method()).toBe("POST");
@@ -669,6 +717,7 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
   page,
 }) => {
   await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, true);
   await mockFitFinder(page);
   await page.route("**/api/fit/explain", async (route) => {
     await route.fulfill({
@@ -702,6 +751,8 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
 test("renders an honest elite-school result and methodology disclosure", async ({
   page,
 }) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
   await page.goto("/");
 
   await expect(page).toHaveTitle(/Admissions Almanac \| Fitty/);
@@ -746,7 +797,12 @@ test("renders an honest elite-school result and methodology disclosure", async (
   ).toBeVisible();
   await expect(page.getByText(/below 20% admit rate/i)).toBeVisible();
   await expect(page.getByText(/Synthetic public-data prior/i).first()).toBeVisible();
-  await expect(page.getByText(/Race and ethnicity are never used/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Race and ethnicity are never used/i }),
+  ).toBeVisible();
+  await expect(page.getByText("Reasons plus ranges, never a fit score.")).toBeVisible();
+  await expect(page.getByText(/campus culture, social fit, teaching quality/i)).toBeVisible();
+  await expect(page.getByText(/Merit aid is not predicted/i)).toBeVisible();
   await expect(page.getByText("Real-outcome calibration ledger.")).toBeVisible();
   await expect(page.getByText("fixture_contract_check")).toBeVisible();
   await expect(page.getByText("Change-course check")).toBeVisible();
