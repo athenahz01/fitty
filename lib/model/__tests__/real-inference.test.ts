@@ -1,14 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  buildChancePayload,
   buildChancePayloadForArtifact,
   engineerFeatures,
+  getActiveArtifact,
+  isServeableRealModel,
   predict,
+  publicPriorArtifact,
   realOutcomeArtifact,
   type InferenceSchool,
+  type RuntimeArtifact,
 } from "../inference";
 import { chanceRequestSchema } from "../schema";
 import realTestVectors from "../test_vectors.real.json";
@@ -86,6 +91,43 @@ function loadSchools() {
 }
 
 const schools = loadSchools();
+const originalRealModelFlag = process.env.ADMIRA_REAL_MODEL_ENABLED;
+
+function restoreRealModelFlag() {
+  if (originalRealModelFlag === undefined) {
+    delete process.env.ADMIRA_REAL_MODEL_ENABLED;
+  } else {
+    process.env.ADMIRA_REAL_MODEL_ENABLED = originalRealModelFlag;
+  }
+}
+
+function validRealArtifact(): RuntimeArtifact {
+  return {
+    ...realOutcomeArtifact,
+    version: "2026.06.17-supabase",
+    honesty_label: "Real-outcome model trained on consented outcomes.",
+  };
+}
+
+function shapeOf(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? [shapeOf(value[0])] : [];
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, shapeOf((value as Record<string, unknown>)[key])]),
+    );
+  }
+
+  return typeof value;
+}
+
+afterEach(() => {
+  restoreRealModelFlag();
+});
 
 describe("real outcome artifact contract", () => {
   it("round-trips generated real-model vectors behind the same TS contract", () => {
@@ -149,5 +191,87 @@ describe("real outcome artifact contract", () => {
     expect(payload.probability.high).toBeGreaterThanOrEqual(
       payload.probability.calibrated,
     );
+  });
+
+  it("uses the public prior when the real-model flag is off", () => {
+    process.env.ADMIRA_REAL_MODEL_ENABLED = "false";
+    const school = schools.get(166683)!;
+    const request = chanceRequestSchema.parse({
+      unitid: 166683,
+      sat_score: 1540,
+      act_score: 35,
+      gpa: 3.95,
+      application_round: "regular",
+    });
+
+    const active = getActiveArtifact(validRealArtifact());
+    const payload = buildChancePayload(request, school, active);
+
+    expect(active).toBe(publicPriorArtifact);
+    expect(payload.model.type).toBe(publicPriorArtifact.model_type);
+  });
+
+  it("uses a valid real artifact when the real-model flag is on", () => {
+    process.env.ADMIRA_REAL_MODEL_ENABLED = "true";
+    const school = schools.get(166683)!;
+    const request = chanceRequestSchema.parse({
+      unitid: 166683,
+      sat_score: 1540,
+      act_score: 35,
+      gpa: 3.95,
+      application_round: "regular",
+    });
+    const realArtifact = validRealArtifact();
+
+    const active = getActiveArtifact(realArtifact);
+    const payload = buildChancePayload(request, school, active);
+
+    expect(isServeableRealModel(realArtifact)).toBe(true);
+    expect(active).toBe(realArtifact);
+    expect(payload.model.type).toBe(realArtifact.model_type);
+    expect(payload.model.honesty_label).toBe(realArtifact.honesty_label);
+  });
+
+  it("falls back to the public prior when the checked-in real artifact is fixture-only", () => {
+    process.env.ADMIRA_REAL_MODEL_ENABLED = "true";
+    const school = schools.get(166683)!;
+    const request = chanceRequestSchema.parse({
+      unitid: 166683,
+      sat_score: 1540,
+      act_score: 35,
+      gpa: 3.95,
+      application_round: "regular",
+    });
+
+    const active = getActiveArtifact();
+    const payload = buildChancePayload(request, school);
+
+    expect(isServeableRealModel(realOutcomeArtifact)).toBe(false);
+    expect(active).toBe(publicPriorArtifact);
+    expect(payload.model.type).toBe(publicPriorArtifact.model_type);
+  });
+
+  it("keeps the response contract identical in prior and real modes", () => {
+    const school = schools.get(166683)!;
+    const request = chanceRequestSchema.parse({
+      unitid: 166683,
+      sat_score: 1540,
+      act_score: 35,
+      gpa: 3.95,
+      application_round: "regular",
+    });
+
+    const priorPayload = buildChancePayloadForArtifact(
+      request,
+      school,
+      publicPriorArtifact,
+    );
+    const realPayload = buildChancePayloadForArtifact(
+      request,
+      school,
+      validRealArtifact(),
+    );
+
+    expect(shapeOf(realPayload)).toEqual(shapeOf(priorPayload));
   });
 });

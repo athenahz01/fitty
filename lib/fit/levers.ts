@@ -1,6 +1,6 @@
 import {
   buildChancePayloadForArtifact,
-  publicPriorArtifact,
+  getActiveArtifact,
   type InferenceSchool,
   type RuntimeArtifact,
 } from "../model/inference";
@@ -169,7 +169,7 @@ function unseenLever(
 export function buildClimbLevers(
   input: LeverInput,
   school: InferenceSchool,
-  runtimeArtifact: RuntimeArtifact = publicPriorArtifact,
+  runtimeArtifact: RuntimeArtifact = getActiveArtifact(),
 ) {
   return [
     buildTestScoreLever(input, school, runtimeArtifact),

@@ -71,10 +71,19 @@ const artifact = publicArtifacts as RuntimeArtifact;
 export const publicPriorArtifact = artifact;
 export const realOutcomeArtifact = realArtifacts as RuntimeArtifact;
 export const featureOrder = artifact.feature_order as FeatureName[];
+let hasLoggedRealModelServe = false;
 
 const TIERS = ["accessible", "selective", "highly_selective", "elite"] as const;
 const TEST_POLICIES = ["required", "optional", "blind", "unknown"] as const;
 const SETTINGS = ["city", "suburb", "town", "rural", "unknown"] as const;
+const UNSERVEABLE_REAL_MARKERS = [
+  "fixture",
+  "placeholder",
+  "contract",
+  "no_real",
+  "not production evidence",
+  "synthetic public-data prior",
+];
 
 const FEATURE_TO_LEVER: Record<FeatureName, string> = {
   sat_gap: "test_score",
@@ -99,6 +108,159 @@ const FEATURE_TO_LEVER: Record<FeatureName, string> = {
   setting_rural: "school_context",
   setting_unknown: "school_context",
 };
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function finiteNumberValue(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function finiteNumberArray(value: unknown, expectedLength: number) {
+  return (
+    Array.isArray(value) &&
+    value.length === expectedLength &&
+    value.every(finiteNumberValue)
+  );
+}
+
+function hasUnsafeRealMarker(artifactCandidate: Record<string, unknown>) {
+  const text = [
+    artifactCandidate.model_type,
+    artifactCandidate.version,
+    artifactCandidate.status,
+    artifactCandidate.source,
+    artifactCandidate.honesty_label,
+  ]
+    .filter((value) => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return UNSERVEABLE_REAL_MARKERS.some((marker) => text.includes(marker));
+}
+
+function featureOrderMatches(value: unknown) {
+  return (
+    Array.isArray(value) &&
+    value.length === featureOrder.length &&
+    value.every((feature, index) => feature === featureOrder[index])
+  );
+}
+
+function featureStatsAreValid(value: unknown, requirePositive: boolean) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const stats = value as Record<string, unknown>;
+  return featureOrder.every((feature) => {
+    const stat = stats[feature];
+    if (!finiteNumberValue(stat)) {
+      return false;
+    }
+    return !requirePositive || stat > 0;
+  });
+}
+
+function isotonicCalibrationIsValid(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const calibration = value as Record<string, unknown>;
+  if (
+    !Array.isArray(calibration.x) ||
+    !Array.isArray(calibration.y) ||
+    calibration.x.length < 2 ||
+    calibration.x.length !== calibration.y.length ||
+    !calibration.x.every(finiteNumberValue) ||
+    !calibration.y.every(finiteNumberValue)
+  ) {
+    return false;
+  }
+
+  return calibration.x.every(
+    (value, index, values) => index === 0 || value >= values[index - 1],
+  );
+}
+
+function conformalParametersAreValid(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const conformal = value as Record<string, unknown>;
+  if (!finiteNumberValue(conformal.target_coverage)) {
+    return false;
+  }
+
+  const byTier = conformal.by_tier;
+  if (!byTier || typeof byTier !== "object") {
+    return false;
+  }
+
+  const tiers = byTier as Record<string, unknown>;
+  return TIERS.every((tier) => {
+    const params = tiers[tier];
+    if (!params || typeof params !== "object") {
+      return false;
+    }
+
+    const tierParams = params as Record<string, unknown>;
+    return (
+      finiteNumberValue(tierParams.interval_half_width) &&
+      finiteNumberValue(tierParams.minimum_public_prior_floor)
+    );
+  });
+}
+
+export function isServeableRealModel(
+  artifactCandidate: unknown,
+): artifactCandidate is RuntimeArtifact {
+  if (!artifactCandidate || typeof artifactCandidate !== "object") {
+    return false;
+  }
+
+  const candidate = artifactCandidate as Record<string, unknown>;
+  const modelType = stringValue(candidate.model_type);
+  const status = stringValue(candidate.status);
+
+  return (
+    modelType !== null &&
+    modelType.startsWith("real_outcome") &&
+    (status === null || status === "trained") &&
+    !hasUnsafeRealMarker(candidate) &&
+    featureOrderMatches(candidate.feature_order) &&
+    finiteNumberArray(candidate.coefficients, featureOrder.length) &&
+    finiteNumberValue(candidate.intercept) &&
+    featureStatsAreValid(candidate.feature_means, false) &&
+    featureStatsAreValid(candidate.feature_scales, true) &&
+    isotonicCalibrationIsValid(candidate.isotonic_calibration) &&
+    conformalParametersAreValid(candidate.conformal_parameters) &&
+    Array.isArray(candidate.lever_metadata) &&
+    candidate.lever_metadata.length > 0 &&
+    stringValue(candidate.version) !== null &&
+    stringValue(candidate.honesty_label) !== null
+  );
+}
+
+export function getActiveArtifact(
+  realCandidate: RuntimeArtifact = realOutcomeArtifact,
+) {
+  if (
+    process.env.ADMIRA_REAL_MODEL_ENABLED === "true" &&
+    isServeableRealModel(realCandidate)
+  ) {
+    if (realCandidate === realOutcomeArtifact && !hasLoggedRealModelServe) {
+      console.info("Admira real-outcome model is active.");
+      hasLoggedRealModelServe = true;
+    }
+    return realCandidate;
+  }
+
+  return publicPriorArtifact;
+}
 
 function finiteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") {
@@ -503,6 +665,10 @@ export function buildChancePayloadForArtifact(
   };
 }
 
-export function buildChancePayload(input: ChanceRequest, school: InferenceSchool) {
-  return buildChancePayloadForArtifact(input, school, artifact);
+export function buildChancePayload(
+  input: ChanceRequest,
+  school: InferenceSchool,
+  runtimeArtifact = getActiveArtifact(),
+) {
+  return buildChancePayloadForArtifact(input, school, runtimeArtifact);
 }

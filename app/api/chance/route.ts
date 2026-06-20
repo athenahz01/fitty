@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 
-import {
-  buildChancePayload,
-  buildChancePayloadForArtifact,
-  publicPriorArtifact,
-  realOutcomeArtifact,
-} from "@/lib/model/inference";
+import { buildChancePayload, getActiveArtifact } from "@/lib/model/inference";
 import { buildClimbLevers } from "@/lib/fit/levers";
 import { chanceRequestSchema, formatValidationError } from "@/lib/model/schema";
 import { createSupabaseServerClient } from "@/lib/supabase";
@@ -67,11 +62,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const useRealModel = process.env.ADMIRA_REAL_MODEL_ENABLED === "true";
-  const runtimeArtifact = useRealModel ? realOutcomeArtifact : publicPriorArtifact;
-  const payload = useRealModel
-    ? buildChancePayloadForArtifact(parsed.data, school, realOutcomeArtifact)
-    : buildChancePayload(parsed.data, school);
+  const runtimeArtifact = getActiveArtifact();
+  const payload = buildChancePayload(parsed.data, school, runtimeArtifact);
 
   return NextResponse.json({
     ...payload,

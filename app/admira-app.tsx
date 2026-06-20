@@ -1946,7 +1946,8 @@ function SchoolSearchPanel({
         <div className="section-kicker">School search</div>
         <h2 className="section-title">Add a school.</h2>
         <p className="panel-subline">
-          Search 2,400+ colleges. Admira reads each one against your profile.
+          Search top U.S. colleges with published admit data. Admira reads each
+          one against your profile.
         </p>
         <div className="school-search">
           <label className="control">
@@ -2455,7 +2456,12 @@ function DisclaimerPanel({ disclaimers }: { disclaimers: string[] }) {
   );
 }
 
-const POPULAR_SCHOOLS = ["Northwestern", "UCLA", "Georgia Tech", "Michigan"];
+const POPULAR_SCHOOLS = [
+  { label: "Northwestern", query: "Northwestern" },
+  { label: "UCLA", query: "California-Los Angeles" },
+  { label: "Georgia Tech", query: "Georgia Institute" },
+  { label: "Michigan", query: "Michigan-Ann Arbor" },
+];
 
 function EmptyState({ onPick }: { onPick: (query: string) => void }) {
   return (
@@ -2472,15 +2478,15 @@ function EmptyState({ onPick }: { onPick: (query: string) => void }) {
         <div className="popular-block">
           <div className="micro-label">Popular right now</div>
           <div className="popular-chips">
-            {POPULAR_SCHOOLS.map((name) => (
+            {POPULAR_SCHOOLS.map((school) => (
               <button
-                key={name}
+                key={school.label}
                 type="button"
                 className="popular-chip"
-                onClick={() => onPick(name)}
+                onClick={() => onPick(school.query)}
               >
                 <Plus size={13} aria-hidden="true" />
-                {name}
+                {school.label}
               </button>
             ))}
           </div>
