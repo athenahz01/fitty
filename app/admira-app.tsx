@@ -299,6 +299,26 @@ function validateProfile(profile: Profile) {
   return errors;
 }
 
+function profileFieldErrors(profile: Profile) {
+  const gpa = numberOrUndefined(profile.gpa);
+  const sat = numberOrUndefined(profile.sat);
+  const act = numberOrUndefined(profile.act);
+  const out: { gpa?: string; sat?: string; act?: string } = {};
+
+  if (gpa !== undefined && (gpa < 0 || gpa > 5)) {
+    out.gpa = "GPA is out of range. Use 0 to 5.";
+  }
+  if (!profile.notSubmittingTests) {
+    if (sat !== undefined && (!Number.isInteger(sat) || sat < 400 || sat > 1600)) {
+      out.sat = "SAT is out of range. Max is 1600.";
+    }
+    if (act !== undefined && (!Number.isInteger(act) || act < 1 || act > 36)) {
+      out.act = "ACT is out of range. Max is 36.";
+    }
+  }
+  return out;
+}
+
 function buildChanceBody(profile: Profile, unitid: number) {
   const gpa = numberOrUndefined(profile.gpa);
   const sat = profile.notSubmittingTests ? undefined : numberOrUndefined(profile.sat);
@@ -640,6 +660,7 @@ export function AdmiraApp() {
               errors={profileErrors}
               notice={formNotice}
               noAcademicInput={noAcademicInput}
+              onSave={recalculateAll}
             />
             <CantSeeBlock />
             {readyResults.length > 0 ? <BalancePanel results={readyResults} /> : null}
@@ -719,18 +740,21 @@ function ProfilePanel({
   errors,
   notice,
   noAcademicInput,
+  onSave,
 }: {
   profile: Profile;
   setProfile: Dispatch<SetStateAction<Profile>>;
   errors: string[];
   notice: string;
   noAcademicInput: boolean;
+  onSave: () => void;
 }) {
   function update(key: keyof Profile, value: string | boolean) {
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
   const readiness = profileReadiness(profile);
+  const fieldErrors = profileFieldErrors(profile);
 
   return (
     <section className="profile-card" id="student-profile">
@@ -765,8 +789,15 @@ function ProfilePanel({
                 inputMode="decimal"
                 placeholder="3.85"
                 value={profile.gpa}
+                data-invalid={fieldErrors.gpa ? "true" : undefined}
+                aria-invalid={fieldErrors.gpa ? true : undefined}
                 onChange={(event) => update("gpa", event.target.value)}
               />
+              {fieldErrors.gpa ? (
+                <FieldError text={fieldErrors.gpa} />
+              ) : (
+                <span className="helper">On a 0 to 5 scale.</span>
+              )}
             </label>
             <label className="control">
               <span className="field-label">Home state</span>
@@ -776,22 +807,29 @@ function ProfilePanel({
                 value={profile.homeState}
                 onChange={(event) => update("homeState", event.target.value)}
               />
-              <span className="helper">Not yet used by the model.</span>
+              <span className="helper">Can shift public-school odds. Not yet in the model.</span>
             </label>
           </div>
 
-          <div className="toggle-row">
-            <div>
-              <div className="field-label">Test submission</div>
-              <div className="helper">Leave off to show the widened band.</div>
+          <div className="control">
+            <span className="field-label">Are you submitting test scores?</span>
+            <div className="segmented" role="group" aria-label="Test scores">
+              <button
+                type="button"
+                data-active={!profile.notSubmittingTests}
+                onClick={() => update("notSubmittingTests", false)}
+              >
+                Submitting
+              </button>
+              <button
+                type="button"
+                data-active={profile.notSubmittingTests}
+                onClick={() => update("notSubmittingTests", true)}
+              >
+                Test-optional
+              </button>
             </div>
-            <button
-              type="button"
-              data-active={profile.notSubmittingTests}
-              onClick={() => update("notSubmittingTests", !profile.notSubmittingTests)}
-            >
-              {profile.notSubmittingTests ? "Not submitting" : "Submitting"}
-            </button>
+            <span className="helper">Test-optional shows the widened band.</span>
           </div>
 
           <div className="field-pair">
@@ -803,8 +841,15 @@ function ProfilePanel({
                 inputMode="numeric"
                 placeholder="1480"
                 value={profile.sat}
+                data-invalid={fieldErrors.sat ? "true" : undefined}
+                aria-invalid={fieldErrors.sat ? true : undefined}
                 onChange={(event) => update("sat", event.target.value)}
               />
+              {fieldErrors.sat ? (
+                <FieldError text={fieldErrors.sat} />
+              ) : (
+                <span className="helper">Out of 1600. Admira uses your stronger score.</span>
+              )}
             </label>
             <label className="control">
               <span className="field-label">ACT</span>
@@ -814,8 +859,15 @@ function ProfilePanel({
                 inputMode="numeric"
                 placeholder="33"
                 value={profile.act}
+                data-invalid={fieldErrors.act ? "true" : undefined}
+                aria-invalid={fieldErrors.act ? true : undefined}
                 onChange={(event) => update("act", event.target.value)}
               />
+              {fieldErrors.act ? (
+                <FieldError text={fieldErrors.act} />
+              ) : (
+                <span className="helper">Composite. Optional.</span>
+              )}
             </label>
           </div>
 
@@ -837,6 +889,7 @@ function ProfilePanel({
                 Early
               </button>
             </div>
+            <span className="helper">Early can lift published rates where the spread is real.</span>
           </div>
 
           <label className="control">
@@ -851,35 +904,57 @@ function ProfilePanel({
           </label>
 
           <label className="control">
-            <span className="field-label">Activity-tier note</span>
+            <span className="field-label field-label-row">
+              Activities and context
+              <span className="not-scored-tag">Not scored yet</span>
+            </span>
             <textarea
               className="activity-control"
-              placeholder="Optional context. Not yet used by the model."
+              placeholder="Robotics captain, published research, part-time job..."
               value={profile.activityNote}
               onChange={(event) => update("activityNote", event.target.value)}
             />
-            <span className="helper">Planned context field; not sent to inference yet.</span>
+            <span className="helper">
+              Context only. This is not in the model yet, so it never changes your range.
+            </span>
           </label>
         </div>
 
-        {errors.length > 0 ? (
-          <p className="error-copy" role="alert">
-            {errors.join(" ")}
-          </p>
-        ) : null}
+        <div className="sr-only" role="status" aria-live="polite">
+          {errors.join(" ")}
+        </div>
         {notice ? (
           <p className="error-copy" role="alert">
             {notice}
           </p>
         ) : null}
         {noAcademicInput ? (
-          <p className="helper">
+          <p className="helper profile-low-input">
             No submitted SAT or ACT is being sent. Admira will still respond, but
             the band is widened and marked low input confidence.
           </p>
         ) : null}
+
+        <div className="profile-footer">
+          <span className="profile-assurance">
+            <Check size={15} aria-hidden="true" />
+            Your inputs never train the model.
+          </span>
+          <button type="button" className="profile-save" onClick={onSave}>
+            Save profile
+          </button>
+        </div>
       </div>
     </section>
+  );
+}
+
+function FieldError({ text }: { text: string }) {
+  return (
+    <span className="field-error" role="alert">
+      <AlertTriangle size={13} aria-hidden="true" />
+      {text}
+    </span>
   );
 }
 

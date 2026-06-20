@@ -35,6 +35,9 @@
     0 0 0 1px rgba(42, 31, 24, 0.1),
     0 16px 38px rgba(42, 31, 24, 0.1);
   --tick: rgba(42, 31, 24, 0.38);
+  --error: #dc2626;
+  --error-wash: #fef2f2;
+  --error-ring: rgba(220, 38, 38, 0.32);
   --sigil-grad: linear-gradient(155deg, #fb923c 0%, #ea580c 52%, #c2410c 100%);
   --sigil-on: #fff8f2;
   --r-card: 20px;
@@ -76,6 +79,9 @@
   --paper-shadow: 0 0 0 1px rgba(246, 239, 231, 0.08);
   --paper-shadow-hover: 0 0 0 1px rgba(246, 239, 231, 0.14);
   --tick: rgba(246, 239, 231, 0.42);
+  --error: #f87171;
+  --error-wash: #3a1515;
+  --error-ring: rgba(248, 113, 113, 0.36);
   --background: var(--canvas);
   --foreground: var(--ink);
 }
@@ -393,6 +399,104 @@ button {
   border-color: var(--chance-primary);
   box-shadow: 0 0 0 3px var(--focus-ring);
   outline: none;
+}
+
+.text-control[data-invalid="true"] {
+  border-color: var(--error);
+  background: var(--error-wash);
+}
+
+.text-control[data-invalid="true"]:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px var(--error-ring);
+}
+
+.field-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+
+.field-error svg {
+  flex: none;
+}
+
+.field-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.not-scored-tag {
+  border-radius: 999px;
+  background: var(--school-indigo-wash);
+  color: var(--school-indigo);
+  font-family: var(--font-data), monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.profile-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+
+.profile-assurance {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--fit-teal);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.profile-assurance svg {
+  flex: none;
+}
+
+.profile-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--chance-primary);
+  color: var(--plain-card);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 18px;
+  transition-property: opacity, scale, box-shadow;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+
+.profile-save:hover {
+  box-shadow: 0 8px 20px rgba(194, 65, 12, 0.24);
+}
+
+.profile-save:active {
+  scale: 0.97;
+}
+
+.profile-low-input {
+  margin-top: 12px;
+  border-left: 3px solid var(--caution-orange);
+  border-radius: var(--r-control);
+  background: var(--control-bg);
+  padding: 10px 12px;
 }
 
 .segmented {
