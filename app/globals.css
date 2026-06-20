@@ -802,6 +802,135 @@ button {
   margin-top: 14px;
 }
 
+/* Page-5 balance summary */
+.balance-bar {
+  display: flex;
+  gap: 4px;
+  height: 12px;
+  margin-top: 18px;
+}
+
+.balance-seg {
+  min-width: 14px;
+  border-radius: 999px;
+}
+
+.balance-seg[data-band="reach"] {
+  background: var(--chance-primary);
+}
+
+.balance-seg[data-band="target"] {
+  background: #eab308;
+}
+
+.balance-seg[data-band="likely"] {
+  background: var(--fit-green);
+}
+
+.balance-rows {
+  display: grid;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.balance-rows li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+}
+
+.balance-rows li + li {
+  border-top: 1px solid var(--rule);
+}
+
+.balance-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.balance-rows li[data-band="reach"] .balance-swatch {
+  background: var(--chance-primary);
+}
+
+.balance-rows li[data-band="target"] .balance-swatch {
+  background: #eab308;
+}
+
+.balance-rows li[data-band="likely"] .balance-swatch {
+  background: var(--fit-green);
+}
+
+.balance-row-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.balance-row-count {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.balance-rows li[data-band="reach"] .balance-row-count {
+  color: var(--chance-ink);
+}
+
+.balance-rows li[data-band="target"] .balance-row-count {
+  color: #a16207;
+}
+
+:root[data-theme="dark"] .balance-rows li[data-band="target"] .balance-row-count {
+  color: #fde68a;
+}
+
+.balance-rows li[data-band="likely"] .balance-row-count {
+  color: var(--fit-teal);
+}
+
+.lopsided-block {
+  display: grid;
+  gap: 10px;
+  border-radius: var(--r-panel);
+  background: var(--chance-wash);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chance-primary) 20%, transparent);
+  padding: 16px 18px;
+}
+
+.lopsided-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lopsided-block p {
+  margin: 0;
+  color: var(--chance-ink);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.lopsided-block .profile-save {
+  justify-self: start;
+}
+
+/* Your schools list header */
+.results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.results-count {
+  color: var(--faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .result-card {
   overflow: hidden;
 }

@@ -690,6 +690,15 @@ export function AdmiraApp() {
               <EmptyState onPick={setSchoolQuery} />
             ) : (
               <>
+                <div className="results-head">
+                  <div>
+                    <div className="section-kicker">Your schools</div>
+                    <h2 className="section-title">Read the range first.</h2>
+                  </div>
+                  <span className="results-count mono">
+                    {addedSchools.length} added &middot; sorted by odds
+                  </span>
+                </div>
                 {addedSchools.map((entry) => (
                   <ResultState
                     key={entry.school.unitid}
@@ -786,6 +795,7 @@ function ProfilePanel({
               <span className="field-label">GPA</span>
               <input
                 className="text-control mono"
+                aria-label="GPA"
                 inputMode="decimal"
                 placeholder="3.85"
                 value={profile.gpa}
@@ -837,6 +847,7 @@ function ProfilePanel({
               <span className="field-label">SAT</span>
               <input
                 className="text-control mono"
+                aria-label="SAT"
                 disabled={profile.notSubmittingTests}
                 inputMode="numeric"
                 placeholder="1480"
@@ -855,6 +866,7 @@ function ProfilePanel({
               <span className="field-label">ACT</span>
               <input
                 className="text-control mono"
+                aria-label="ACT"
                 disabled={profile.notSubmittingTests}
                 inputMode="numeric"
                 placeholder="33"
@@ -1946,6 +1958,7 @@ function SchoolSearchPanel({
                 size={17}
               />
               <input
+                id="school-search-input"
                 className="text-control pl-10"
                 placeholder="MIT, Michigan, Alabama..."
                 value={query}
@@ -2053,53 +2066,79 @@ function BalancePanel({ results }: { results: ChanceResponse[] }) {
     counts[result.band.label] += 1;
   });
 
+  const total = results.length;
   const warning =
-    results.length === 0
+    total === 0
       ? ""
-      : counts.reach === results.length
+      : counts.reach === total
         ? "Every school on your list is a reach. Consider adding schools where the band sits higher."
         : counts.likely === 0
           ? "No likely bands yet. Add at least one school whose interval clears the upper half of the scale."
           : "";
 
+  const segments: { key: BandLabel; label: string }[] = [
+    { key: "reach", label: "Reach" },
+    { key: "target", label: "Target" },
+    { key: "likely", label: "Likely" },
+  ];
+
+  function focusSearch() {
+    const el = document.getElementById("school-search-input");
+    el?.scrollIntoView({ block: "center" });
+    (el as HTMLInputElement | null)?.focus();
+  }
+
   return (
-    <section className="balance-panel">
-      <div className="panel-inner">
-        <div className="section-kicker">List balance</div>
-        <h2 className="section-title">The labels follow the intervals.</h2>
-        <div className="balance-grid" aria-label="Interval-derived list balance">
-          {labelOrder.map((label) => (
-            <div key={label} className="balance-cell">
-              <div className="balance-count">{counts[label]}</div>
-              <div className="field-label">{label}</div>
-            </div>
-          ))}
-        </div>
-        {results.length > 0 ? (
-          <div className="balance-stack">
-            {results.map((result) => (
-              <MiniRangeBand
-                key={result.school.unitid}
-                low={result.probability.low}
-                high={result.probability.high}
-                point={result.probability.calibrated}
-                label={result.school.name}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="helper">
-            Add a school to see whether the list is all reach, balanced, or
-            missing likely options.
+    <>
+      <section className="balance-panel">
+        <div className="panel-inner">
+          <div className="section-kicker">List balance</div>
+          <h2 className="section-title">Your balance.</h2>
+          <p className="panel-subline">
+            Across {total} {total === 1 ? "school" : "schools"}.
           </p>
-        )}
-        {warning ? (
-          <p className="error-copy" role="status" data-testid="balance-warning">
+          <div
+            className="balance-bar"
+            aria-label="Interval-derived list balance"
+            role="img"
+          >
+            {segments.map((segment) =>
+              counts[segment.key] > 0 ? (
+                <span
+                  key={segment.key}
+                  className="balance-seg"
+                  data-band={segment.key}
+                  style={{ flexGrow: counts[segment.key] }}
+                />
+              ) : null,
+            )}
+          </div>
+          <ul className="balance-rows">
+            {segments.map((segment) => (
+              <li key={segment.key} data-band={segment.key}>
+                <span className="balance-swatch" aria-hidden="true" />
+                <span className="balance-row-label">{segment.label}</span>
+                <span className="balance-row-count mono">{counts[segment.key]}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+      {warning ? (
+        <section className="lopsided-block">
+          <div className="section-kicker chance-kicker lopsided-kicker">
+            <AlertTriangle size={13} aria-hidden="true" />
+            Lopsided list
+          </div>
+          <p data-testid="balance-warning" role="status">
             {warning}
           </p>
-        ) : null}
-      </div>
-    </section>
+          <button type="button" className="profile-save" onClick={focusSearch}>
+            Add a likely
+          </button>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -2289,40 +2328,6 @@ function RangeBand({
       </div>
       <span className="scale-end left">0%</span>
       <span className="scale-end right">100%</span>
-    </div>
-  );
-}
-
-function MiniRangeBand({
-  low,
-  high,
-  point,
-  label,
-}: {
-  low: number;
-  high: number;
-  point: number;
-  label: string;
-}) {
-  const left = clampPercent(low);
-  const right = clampPercent(high);
-  const width = Math.max(1, right - left);
-  const pointLeft = clampPercent(point);
-
-  return (
-    <div className="mini-range">
-      <div
-        className="mini-range-track"
-        role="img"
-        aria-label={`${label}: interval ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)}, marker at ${formatPercentPrecise(point)}`}
-      >
-        <span
-          className="mini-range-band"
-          style={{ left: `${left}%`, width: `${width}%` }}
-        />
-        <span className="mini-range-point" style={{ left: `${pointLeft}%` }} />
-      </div>
-      <span className="mini-band-caption">{label}</span>
     </div>
   );
 }
