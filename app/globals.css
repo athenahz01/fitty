@@ -944,9 +944,38 @@ button {
   padding: 20px 20px 16px;
 }
 
+.result-head-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+}
+
+.result-sigil {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--school-indigo-wash);
+  color: var(--school-indigo);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.result-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
 .result-title {
   margin: 0;
-  font-size: clamp(22px, 3vw, 34px);
+  font-size: clamp(22px, 3vw, 32px);
   line-height: 1.04;
 }
 
@@ -1030,43 +1059,44 @@ button {
 
 .range-scale {
   position: relative;
-  min-height: 94px;
+  min-height: 84px;
   border-radius: var(--r-panel);
-  background: var(--chance-wash);
+  background: var(--surface-soft);
   box-shadow: inset 0 0 0 1px var(--rule);
-  padding: 34px 16px 24px;
+  padding: 30px 16px 26px;
 }
 
 .scale-rail {
   position: relative;
-  height: 14px;
+  height: 22px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--chance-soft) 18%, var(--warm-card));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chance-primary) 14%, transparent);
+  background: linear-gradient(
+    90deg,
+    var(--reach-wash) 0 30%,
+    var(--target-wash) 30% 55%,
+    var(--likely-wash) 55% 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 .scale-band {
   position: absolute;
-  top: -3px;
-  height: 20px;
+  top: 0;
+  height: 22px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--chance-bright) 82%, var(--chance-soft));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--chance-primary) 52%, transparent),
-    0 8px 18px rgba(194, 65, 12, 0.16);
+  background: color-mix(in srgb, var(--chance-primary) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chance-primary) 48%, transparent);
 }
 
 .scale-point {
   position: absolute;
-  top: -8px;
-  width: 26px;
-  height: 26px;
-  border: 6px solid var(--plain-card);
+  top: -6px;
+  width: 4px;
+  height: 34px;
+  border: 0;
   border-radius: 999px;
-  background: var(--chance-bright);
-  box-shadow:
-    0 0 0 2px var(--chance-bright),
-    0 8px 18px rgba(194, 65, 12, 0.18);
+  background: var(--chance-ink);
+  box-shadow: 0 2px 7px rgba(42, 31, 24, 0.3);
   transform: translateX(-50%);
 }
 
@@ -1076,7 +1106,7 @@ button {
 
 .scale-end {
   position: absolute;
-  top: 59px;
+  top: 58px;
   color: var(--faint);
   font-family: var(--font-data), monospace;
   font-size: 12px;

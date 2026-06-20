@@ -2214,15 +2214,20 @@ function ResultCard({
   return (
     <article className="result-card" data-testid="result-card">
       <div className="result-head">
-        <div>
-          <div className="section-kicker">School record</div>
-          <h3 className="result-title">{result.school.name}</h3>
-          <p className="helper">
-            {result.school.selectivity_tier ?? "Tier unknown"} -{" "}
-            {result.school.test_policy ?? "unknown"} testing policy
-          </p>
+        <div className="result-head-main">
+          <span className="result-sigil" aria-hidden="true">
+            {schoolInitial(result.school.name)}
+          </span>
+          <div>
+            <div className="section-kicker">School record</div>
+            <h3 className="result-title">{result.school.name}</h3>
+            <p className="helper">
+              {formatTier(result.school.selectivity_tier)} &middot;{" "}
+              {result.school.test_policy ?? "unknown"} testing
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="result-head-actions">
           <BandPill label={result.band.label} />
           <button
             className="icon-button"
