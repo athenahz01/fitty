@@ -1625,10 +1625,7 @@ button {
 }
 
 .consent-step {
-  background:
-    linear-gradient(90deg, var(--tick) 1px, transparent 1px),
-    var(--surface-soft);
-  background-size: 18px 100%;
+  background: var(--surface-soft);
 }
 
 .consent-copy {
@@ -2231,10 +2228,7 @@ button {
 }
 
 .fit-disclaimers {
-  background:
-    linear-gradient(90deg, var(--tick) 1px, transparent 1px),
-    var(--surface-soft);
-  background-size: 18px 100%;
+  background: var(--surface-soft);
 }
 
 .inline-link {
@@ -2285,10 +2279,7 @@ button {
 }
 
 .data-controls-panel {
-  background:
-    linear-gradient(90deg, rgba(68, 63, 51, 0.025) 1px, transparent 1px),
-    var(--warm-card);
-  background-size: 22px 100%;
+  background: var(--warm-card);
 }
 
 .control-card {
@@ -2370,10 +2361,7 @@ button {
   align-content: center;
   gap: 8px;
   border-radius: var(--r-panel);
-  background:
-    linear-gradient(90deg, var(--tick) 1px, transparent 1px),
-    var(--surface-soft);
-  background-size: 18px 100%;
+  background: var(--surface-soft);
   box-shadow: inset 0 0 0 1px var(--rule);
   padding: 18px;
 }
