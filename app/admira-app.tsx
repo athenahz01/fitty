@@ -3,12 +3,12 @@
 import Link from "next/link";
 import {
   AlertTriangle,
-  BookOpen,
   Check,
   CircleHelp,
   Compass,
-  FileSearch,
+  GraduationCap,
   Loader2,
+  MapPin,
   Moon,
   Plus,
   RefreshCw,
@@ -17,7 +17,7 @@ import {
   Sun,
   Trash2,
 } from "lucide-react";
-import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
@@ -641,27 +641,8 @@ export function AdmiraApp() {
               notice={formNotice}
               noAcademicInput={noAcademicInput}
             />
-            <SchoolSearchPanel
-              query={schoolQuery}
-              setQuery={setSchoolQuery}
-              results={schoolResults}
-              status={schoolSearchStatus}
-              error={schoolSearchError}
-              onAdd={addSchool}
-              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
-            />
-            <BalancePanel results={readyResults} />
-            {addedSchools.length > 0 ? (
-              <button
-                className="add-button"
-                type="button"
-                onClick={recalculateAll}
-                disabled={addedSchools.some((entry) => entry.status === "loading")}
-              >
-                <RefreshCw size={16} />
-                Recalculate list
-              </button>
-            ) : null}
+            <CantSeeBlock />
+            {readyResults.length > 0 ? <BalancePanel results={readyResults} /> : null}
           </aside>
 
           <section className="results-column" aria-label="School chance results">
@@ -675,16 +656,36 @@ export function AdmiraApp() {
                 addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
               />
             ) : null}
+            <SchoolSearchPanel
+              query={schoolQuery}
+              setQuery={setSchoolQuery}
+              results={schoolResults}
+              status={schoolSearchStatus}
+              error={schoolSearchError}
+              onAdd={addSchool}
+              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+            />
             {addedSchools.length === 0 ? (
-              <EmptyState />
+              <EmptyState onPick={setSchoolQuery} />
             ) : (
-              addedSchools.map((entry) => (
-                <ResultState
-                  key={entry.school.unitid}
-                  entry={entry}
-                  onRemove={() => removeSchool(entry.school.unitid)}
-                />
-              ))
+              <>
+                {addedSchools.map((entry) => (
+                  <ResultState
+                    key={entry.school.unitid}
+                    entry={entry}
+                    onRemove={() => removeSchool(entry.school.unitid)}
+                  />
+                ))}
+                <button
+                  className="recalc-button"
+                  type="button"
+                  onClick={recalculateAll}
+                  disabled={addedSchools.some((entry) => entry.status === "loading")}
+                >
+                  <RefreshCw size={16} />
+                  Recalculate list
+                </button>
+              </>
             )}
           </section>
         </div>
@@ -696,6 +697,20 @@ export function AdmiraApp() {
       </div>
     </main>
   );
+}
+
+function profileReadiness(profile: Profile) {
+  const signals = [
+    Boolean(numberOrUndefined(profile.gpa)),
+    profile.notSubmittingTests ||
+      Boolean(numberOrUndefined(profile.sat)) ||
+      Boolean(numberOrUndefined(profile.act)),
+    profile.homeState.trim().length > 0,
+    profile.intendedMajor.trim().length > 0 &&
+      profile.intendedMajor.trim().toLowerCase() !== "undecided",
+  ];
+  const filled = signals.filter(Boolean).length;
+  return Math.round((filled / signals.length) * 100);
 }
 
 function ProfilePanel({
@@ -715,11 +730,32 @@ function ProfilePanel({
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
+  const readiness = profileReadiness(profile);
+
   return (
     <section className="profile-card" id="student-profile">
       <div className="panel-inner">
-        <div className="section-kicker">Student profile</div>
-        <h2 className="section-title">Academic evidence entered here.</h2>
+        <div className="profile-rail-head">
+          <div className="profile-avatar" aria-hidden="true">
+            <GraduationCap size={20} />
+          </div>
+          <div className="profile-rail-copy">
+            <div className="section-kicker">Your profile</div>
+            <h2 className="section-title">Academic evidence</h2>
+          </div>
+        </div>
+        <div className="profile-meter" aria-hidden="true">
+          <div className="profile-meter-head">
+            <span className="micro-label">Profile</span>
+            <span className="profile-ready">{readiness}% ready</span>
+          </div>
+          <div className="profile-meter-track">
+            <span style={{ width: `${readiness}%` }} />
+          </div>
+        </div>
+        <p className="helper profile-rail-hint">
+          The more Admira knows, the tighter every range.
+        </p>
         <div className="profile-grid">
           <div className="field-pair">
             <label className="control">
@@ -1806,8 +1842,11 @@ function SchoolSearchPanel({
   return (
     <section className="search-panel">
       <div className="panel-inner">
-        <div className="section-kicker">School list</div>
-        <h2 className="section-title">Add schools to measure.</h2>
+        <div className="section-kicker">School search</div>
+        <h2 className="section-title">Add a school.</h2>
+        <p className="panel-subline">
+          Search 2,400+ colleges. Admira reads each one against your profile.
+        </p>
         <div className="school-search">
           <label className="control">
             <span className="field-label">Search by school name</span>
@@ -2274,39 +2313,54 @@ function DisclaimerPanel({ disclaimers }: { disclaimers: string[] }) {
   );
 }
 
-function EmptyState() {
+const POPULAR_SCHOOLS = ["Northwestern", "UCLA", "Georgia Tech", "Michigan"];
+
+function EmptyState({ onPick }: { onPick: (query: string) => void }) {
   return (
     <section className="empty-state-card">
-      <FileSearch size={28} aria-hidden="true" />
-      <h2 className="empty-title mt-4">Start with one school record.</h2>
-      <p className="muted mt-3 max-w-2xl">
-        Search the public schools table, add a target, and Admira will render the
-        interval first. The point estimate will only appear as a marker inside
-        the band.
-      </p>
-      <div className="empty-measure" aria-hidden="true">
-        <div className="skeleton-band" />
+      <div className="empty-state-inner">
+        <div className="empty-pin" aria-hidden="true">
+          <MapPin size={20} />
+        </div>
+        <h2 className="empty-title">Your first read appears here.</h2>
+        <p className="empty-sub">
+          Add a school and Admira shows an honest range, never a single number,
+          plus what it cannot see.
+        </p>
+        <div className="popular-block">
+          <div className="micro-label">Popular right now</div>
+          <div className="popular-chips">
+            {POPULAR_SCHOOLS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className="popular-chip"
+                onClick={() => onPick(name)}
+              >
+                <Plus size={13} aria-hidden="true" />
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      <p className="scale-caption">
-        No placeholder odds. The scale waits for a school record.
+      <p className="empty-footnote">
+        <span className="footnote-dot" aria-hidden="true" />
+        Calibrated on real CDS admit data. Ranges, not points.
       </p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <EmptyRule icon={<BookOpen size={17} />} text="Read the range first." />
-        <EmptyRule icon={<Check size={17} />} text="Use levers as next moves." />
-        <EmptyRule icon={<Plus size={17} />} text="Balance the whole list." />
-      </div>
     </section>
   );
 }
 
-function EmptyRule({ icon, text }: { icon: ReactNode; text: string }) {
+function CantSeeBlock() {
   return (
-    <div className="balance-cell">
-      <div className="flex items-center gap-2 text-[var(--muted)]">
-        {icon}
-        <span>{text}</span>
-      </div>
-    </div>
+    <section className="cant-see-block">
+      <div className="section-kicker chance-kicker">What Admira cannot see</div>
+      <p>
+        Essays, recommendations, and demonstrated interest are not in the model.
+        They are the levers still in your hands.
+      </p>
+    </section>
   );
 }
 
