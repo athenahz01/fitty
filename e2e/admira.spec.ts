@@ -825,22 +825,33 @@ test("runs Fit Finder, renders grounded prose, and adds a school to the list", a
   await expect(finder.getByTestId("fit-result-card")).toContainText(
     "Massachusetts Institute of Technology",
   );
-  await expect(finder.getByTestId("fit-result-card")).toContainText("0-49%");
-  await expect(finder.getByTestId("fit-result-card")).toContainText("FIT 82");
+  const fitCard = finder.getByTestId("fit-result-card");
+  await expect(fitCard).toContainText("0-49%");
+  await expect(fitCard).toContainText("FIT 82");
+  await expect(fitCard).toContainText(
+    "Great fit, a genuine reach. FIT 82 is profile overlap, not chance.",
+  );
   await expect(finder.getByTestId("fit-score-panel")).toBeVisible();
+  await expect(finder.locator(".fit-radar svg")).toBeVisible();
   await expect(finder.getByTestId("reach-ladder")).toBeVisible();
-  await expect(finder.getByTestId("climb-levers")).toContainText("Real deltas only");
-  await expect(finder.getByTestId("climb-levers")).toContainText("direction only");
+  await expect(finder.getByTestId("climb-levers")).toContainText(
+    "See how to move this range",
+  );
+  await expect(finder.getByTestId("climb-levers")).toContainText(
+    "not in the model yet",
+  );
   await expect(finder.getByTestId("cannot-see-panel")).toContainText("Essays");
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
-    "FIT is not an admit probability",
+  await expect(finder.getByTestId("cannot-see-panel")).toContainText(
+    "That is why the band stays wide.",
   );
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
-    "programs: computer and information sciences",
+  await expect(fitCard.locator("details.result-details")).not.toHaveAttribute(
+    "open",
+    "",
   );
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
-    "This school fits the stated preferences",
-  );
+  await fitCard.locator("details.result-details summary").click();
+  await expect(fitCard).toContainText("programs: computer and information sciences");
+  await expect(fitCard).toContainText("This school fits the stated preferences");
+  await expect(fitCard).toContainText("Shareable view");
   await expect(finder.getByTestId("fit-balance")).toContainText(
     "All returned schools landed in reach",
   );
@@ -880,14 +891,16 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
 
   const finder = await fillFitFinderForm(page);
+  const fitCard = finder.getByTestId("fit-result-card");
+  await fitCard.locator("details.result-details summary").click();
 
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
+  await expect(fitCard).toContainText(
     "programs: computer and information sciences",
   );
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
+  await expect(fitCard).toContainText(
     "Claude explanation is not configured.",
   );
-  await expect(finder.getByTestId("fit-result-card")).toContainText(
+  await expect(fitCard).toContainText(
     "Published cost only",
   );
 });
@@ -903,32 +916,50 @@ test("renders an honest elite-school result and methodology disclosure", async (
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await page.getByLabel("Intended major").fill("Computer science");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByTestId("profile-summary")).toContainText("GPA 3.95");
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
     .click();
 
-  await expect(page.getByTestId("result-card")).toContainText(
+  const resultCard = page.getByTestId("result-card");
+  await expect(resultCard).toContainText(
     "Massachusetts Institute of Technology",
+  );
+  await expect(resultCard).toContainText(
+    "Strong academic read, but a genuine reach.",
   );
   await expect(page.getByTestId("range-band")).toBeVisible();
   await expect(page.getByTestId("reach-ladder")).toBeVisible();
-  await expect(page.getByText("Climb levers")).toBeVisible();
+  await expect(page.getByText("See how to move this range")).toBeVisible();
+  await expect(page.getByTestId("cannot-see-panel")).toContainText("Interest");
   await expect(page.getByTestId("cannot-see-panel")).toContainText(
-    "Demonstrated interest",
+    "That is why the band stays wide.",
   );
   await expect(page.getByTestId("fit-score-panel")).toHaveCount(0);
-  await expect(page.getByText("C7 rubric grounding")).toBeVisible();
-  await expect(page.getByText("Disclosures")).toBeVisible();
+  await expect(resultCard.locator("details.result-details")).not.toHaveAttribute(
+    "open",
+    "",
+  );
+  await resultCard.locator("details.result-details summary").click();
+  await expect(page.getByText("What this school values")).toBeVisible();
+  await expect(page.getByText("Data notes")).toBeVisible();
   await expect(page.getByText("Source: 2023-24 CDS Common Data Set")).toBeVisible();
+  await expect(page.getByText("SAT 1540 vs 1520-1580")).toBeVisible();
+  await expect(page.getByText("Shareable view")).toBeVisible();
 
   await expect(page.getByTestId("sub20-note")).toContainText(
-    "Sub-20 selectivity limit",
+    "Sub-20 limit",
   );
   await expect(page.getByText(/Public data cannot narrow this interval/)).toBeVisible();
   await expect(page.getByTestId("balance-warning")).toContainText(
     "Every school on your list is a reach",
   );
+  await expect(
+    page.getByRole("button", { name: "Balance my list" }),
+  ).toBeVisible();
   await expect(page.getByText(/your chance/i)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Switch to dark mode" }).click();

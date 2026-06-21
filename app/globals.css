@@ -279,7 +279,10 @@ button {
 .checkbox-row:focus-within,
 .icon-button:focus-visible,
 .inline-link:focus-visible,
-.range-scale:focus-visible {
+.range-scale:focus-visible,
+.profile-edit:focus-visible,
+.result-details summary:focus-visible,
+.balance-cta:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
@@ -979,6 +982,16 @@ button {
   line-height: 1.04;
 }
 
+.result-verdict {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(18px, 2vw, 22px);
+  font-weight: 700;
+  line-height: 1.32;
+  padding: 0 20px;
+  text-wrap: pretty;
+}
+
 .label-pill {
   display: inline-flex;
   align-items: center;
@@ -1219,6 +1232,56 @@ button {
   padding: 16px;
 }
 
+.result-details {
+  margin: 0 20px 20px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.fit-result-card .result-details {
+  margin: 0;
+}
+
+.result-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 800;
+  list-style: none;
+  padding: 14px 16px;
+}
+
+.result-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.result-details summary svg {
+  flex: none;
+  transition: rotate 160ms ease-out;
+}
+
+.result-details[open] summary svg {
+  rotate: 180deg;
+}
+
+.result-details-body {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--rule);
+  padding: 14px;
+}
+
+.detail-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
 .evidence-panel {
   display: grid;
   gap: 14px;
@@ -1251,6 +1314,66 @@ button {
   gap: 12px;
 }
 
+.share-card {
+  display: grid;
+  gap: 12px;
+  border-radius: var(--r-panel);
+  background:
+    linear-gradient(135deg, var(--warm-card), var(--surface-soft));
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 16px;
+}
+
+.share-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-card-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.share-card-main {
+  display: grid;
+  gap: 7px;
+}
+
+.share-card-main h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.08;
+}
+
+.share-range {
+  color: var(--chance-ink);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(34px, 5vw, 52px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.share-card-main p,
+.share-card-note {
+  margin: 0;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.share-card-note {
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+}
+
 .gap-table {
   display: grid;
   gap: 8px;
@@ -1267,11 +1390,49 @@ button {
 
 .gap-row {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 44px minmax(0, 1fr);
   gap: 10px;
-  align-items: baseline;
+  align-items: center;
   border-top: 1px solid var(--rule);
   padding-top: 8px;
+}
+
+.gap-main {
+  display: grid;
+  gap: 7px;
+}
+
+.gap-copy {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gap-line {
+  position: relative;
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--control-bg);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.gap-band {
+  position: absolute;
+  top: 3px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--school-indigo) 48%, transparent);
+}
+
+.gap-marker {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--chance-primary);
+  transform: translateX(-50%);
 }
 
 .loading-card {
@@ -1349,25 +1510,81 @@ button {
   margin: 10px 0 0;
 }
 
+.profile-summary-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 14px;
+}
+
+.profile-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-summary-title {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.profile-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--warm-card);
+  color: var(--chance-primary);
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.profile-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-chip-row li {
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.profile-scope-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.profile-scope-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 .panel-subline {
   margin: 6px 0 0;
   color: var(--muted);
   max-width: 46ch;
-  text-wrap: pretty;
-}
-
-/* What Admira cannot see (peach wash block) */
-.cant-see-block {
-  border-radius: var(--r-panel);
-  background: var(--chance-wash);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chance-primary) 18%, transparent);
-  padding: 16px 18px;
-}
-
-.cant-see-block p {
-  margin: 9px 0 0;
-  color: var(--chance-ink);
-  line-height: 1.55;
   text-wrap: pretty;
 }
 
@@ -1784,6 +2001,10 @@ button {
   padding-bottom: 12px;
 }
 
+.fit-result-card .result-verdict {
+  padding: 0;
+}
+
 .fit-range-block {
   display: grid;
   gap: 10px;
@@ -2112,7 +2333,24 @@ button {
 
 .climb-panel {
   display: grid;
-  gap: 12px;
+  gap: 13px;
+}
+
+.climb-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.climb-head-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--fit-wash);
+  color: var(--fit-teal);
 }
 
 .climb-list {
@@ -2122,11 +2360,47 @@ button {
 
 .climb-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(120px, 1fr) minmax(92px, 0.7fr) auto;
   gap: 12px;
   align-items: center;
   border-top: 1px solid var(--rule);
   padding-top: 10px;
+}
+
+.climb-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.climb-copy span {
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.climb-meter {
+  position: relative;
+  display: block;
+  height: 10px;
+  min-width: 92px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--control-bg);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.climb-meter-fill {
+  position: absolute;
+  inset: 2px auto 2px 2px;
+  min-width: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fit-green) 74%, var(--fit-teal));
+}
+
+.climb-row[data-kind="direction_only"] .climb-meter-fill {
+  background: color-mix(in srgb, var(--muted) 34%, transparent);
 }
 
 .climb-value {
@@ -2147,12 +2421,13 @@ button {
 
 .cannot-see-panel {
   display: grid;
-  gap: 10px;
+  gap: 11px;
+  background: var(--chance-wash);
 }
 
 .blind-spot-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -2160,12 +2435,34 @@ button {
 }
 
 .blind-spot-list li {
-  border-radius: 999px;
-  background: var(--chance-wash);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  border-radius: var(--r-control);
+  background: var(--warm-card);
   color: var(--chance-ink);
-  font-family: var(--font-data), monospace;
   font-size: 12px;
-  padding: 7px 10px;
+  font-weight: 700;
+  min-width: 0;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.blind-spot-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--chance-primary) 14%, transparent);
+  color: var(--chance-primary);
+}
+
+.blind-spot-caption {
+  margin: 0;
+  color: var(--chance-ink);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .fit-reason-grid {
@@ -2559,6 +2856,7 @@ button {
 
   .fit-score-layout,
   .climb-row,
+  .blind-spot-list,
   .fit-dimension-list li {
     grid-template-columns: 1fr;
   }

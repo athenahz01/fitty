@@ -3,16 +3,22 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  BookOpen,
   Check,
+  ChevronDown,
   CircleHelp,
   Compass,
+  FileText,
   GraduationCap,
   Loader2,
   MapPin,
+  MessageCircle,
   Moon,
   Plus,
   RefreshCw,
   Search,
+  Share2,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Trash2,
@@ -275,6 +281,173 @@ function formatDeltaPoints(value: number) {
     return "0 pts";
   }
   return `${rounded > 0 ? "+" : ""}${rounded} pts`;
+}
+
+function bandPhrase(label: BandLabel) {
+  switch (label) {
+    case "reach":
+      return "a genuine reach";
+    case "target":
+      return "a possible target";
+    case "likely":
+      return "a safer range";
+  }
+}
+
+function academicGapSummary(result: ChanceResponse) {
+  const sat = scoreRangeSummary(
+    "SAT",
+    result.rubric.gaps.sat.score,
+    result.school.sat_25,
+    result.school.sat_75,
+  );
+  if (sat) {
+    return sat;
+  }
+
+  const act = scoreRangeSummary(
+    "ACT",
+    result.rubric.gaps.act.score,
+    result.school.act_25,
+    result.school.act_75,
+  );
+  if (act) {
+    return act;
+  }
+
+  const gpa = result.rubric.gaps.gpa.score;
+  if (gpa !== null && result.school.gpa_avg !== null) {
+    return {
+      tone:
+        gpa >= result.school.gpa_avg
+          ? "Strong academic read"
+          : "Academic stretch",
+      sentence: `Your GPA is ${gpa >= result.school.gpa_avg ? "at or above" : "below"} the published average of ${result.school.gpa_avg}.`,
+    };
+  }
+
+  return {
+    tone: "Public-data read",
+    sentence: "The public academic data is thin, so the band stays wide.",
+  };
+}
+
+function scoreRangeSummary(
+  label: "SAT" | "ACT",
+  score: number | null,
+  low: number | null,
+  high: number | null,
+) {
+  if (score === null || low === null || high === null) {
+    return null;
+  }
+
+  if (score < low) {
+    return {
+      tone: "Academic stretch",
+      sentence: `Your ${label} is below this school's middle 50 (${low}-${high}).`,
+    };
+  }
+
+  if (score > high) {
+    return {
+      tone: "Strong academic read",
+      sentence: `Your ${label} is above this school's middle 50 (${low}-${high}).`,
+    };
+  }
+
+  return {
+    tone: "Strong academic read",
+    sentence: `Your ${label} sits inside this school's middle 50 (${low}-${high}).`,
+  };
+}
+
+function buildChanceVerdict(result: ChanceResponse) {
+  const gap = academicGapSummary(result);
+  const band = bandPhrase(result.band.label);
+  const connector = result.band.label === "reach" ? "but" : "and";
+
+  return `${gap.tone}, ${connector} ${band}. ${gap.sentence}`;
+}
+
+function buildFitVerdict(result: FitResult) {
+  const score = result.fit_score?.score;
+  const fitTone =
+    score === null || score === undefined
+      ? "Fit read"
+      : score >= 80
+        ? "Great fit"
+        : score >= 65
+          ? "Solid fit"
+          : "Mixed fit";
+  const band = bandPhrase(result.band.label);
+  const scoreCopy =
+    score === null || score === undefined
+      ? "FIT needs more known axes to say more."
+      : `FIT ${score} is profile overlap, not chance.`;
+
+  return `${fitTone}, ${band}. ${scoreCopy}`;
+}
+
+function visibleLevers(levers: ClimbLever[]) {
+  const visible = levers.filter(
+    (lever) =>
+      !["essays", "recommendations", "demonstrated_interest"].includes(
+        lever.id,
+      ),
+  );
+  const actionable = visible.filter(
+    (lever) =>
+      lever.delta ||
+      lever.id === "test_score" ||
+      lever.id === "application_round",
+  );
+  const source = actionable.length > 0 ? actionable : visible;
+  return source.slice(0, 3);
+}
+
+function formatLeverDelta(lever: ClimbLever) {
+  if (!lever.delta) {
+    return "not in the model yet";
+  }
+
+  if (lever.kind === "published_delta") {
+    return `${formatDeltaPoints(lever.delta.tick)} published spread`;
+  }
+
+  return `${formatDeltaPoints(lever.delta.low)} to ${formatDeltaPoints(
+    lever.delta.high,
+  )}`;
+}
+
+function leverImpactWidth(lever: ClimbLever) {
+  if (!lever.delta) {
+    return 18;
+  }
+
+  const impact = Math.max(
+    Math.abs(lever.delta.low),
+    Math.abs(lever.delta.high),
+    Math.abs(lever.delta.tick),
+  );
+  return Math.max(18, Math.min(100, Math.round(impact * 500)));
+}
+
+function leverKindLabel(lever: ClimbLever) {
+  if (!lever.delta) {
+    return "Not in model";
+  }
+
+  return lever.kind === "published_delta" ? "School data" : "Modeled move";
+}
+
+function filteredDisclaimers(disclaimers: string[]) {
+  return disclaimers.filter(
+    (disclaimer) =>
+      !/essay|recommendation|institutional priorit|demonstrated interest/i.test(
+        disclaimer,
+      ),
+  );
 }
 
 function validateProfile(profile: Profile) {
@@ -662,7 +835,6 @@ export function AdmiraApp() {
               noAcademicInput={noAcademicInput}
               onSave={recalculateAll}
             />
-            <CantSeeBlock />
             {readyResults.length > 0 ? <BalancePanel results={readyResults} /> : null}
           </aside>
 
@@ -743,6 +915,25 @@ function profileReadiness(profile: Profile) {
   return Math.round((filled / signals.length) * 100);
 }
 
+function profileSummaryItems(profile: Profile) {
+  const test =
+    profile.notSubmittingTests
+      ? "Test optional"
+      : [
+          profile.sat.trim() ? `SAT ${profile.sat.trim()}` : "",
+          profile.act.trim() ? `ACT ${profile.act.trim()}` : "",
+        ]
+          .filter(Boolean)
+          .join(" / ") || "No test score";
+
+  return [
+    `GPA ${profile.gpa || "not set"}`,
+    test,
+    profile.applicationRound === "early" ? "Early round" : "Regular round",
+    profile.intendedMajor.trim() || "Major undecided",
+  ];
+}
+
 function ProfilePanel({
   profile,
   setProfile,
@@ -758,12 +949,25 @@ function ProfilePanel({
   noAcademicInput: boolean;
   onSave: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+
   function update(key: keyof Profile, value: string | boolean) {
+    setIsEditing(true);
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
   const readiness = profileReadiness(profile);
   const fieldErrors = profileFieldErrors(profile);
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const isComplete = readiness === 100 && errors.length === 0 && !hasFieldErrors;
+  const showSummary = isComplete && !isEditing;
+
+  function handleSave() {
+    onSave();
+    if (isComplete) {
+      setIsEditing(false);
+    }
+  }
 
   return (
     <section className="profile-card" id="student-profile">
@@ -789,6 +993,34 @@ function ProfilePanel({
         <p className="helper profile-rail-hint">
           The more Admira knows, the tighter every range.
         </p>
+        {showSummary ? (
+          <div className="profile-summary-card" data-testid="profile-summary">
+            <div className="profile-summary-head">
+              <div>
+                <div className="micro-label">Ready to read schools</div>
+                <h3 className="profile-summary-title">Profile saved.</h3>
+              </div>
+              <button
+                type="button"
+                className="profile-edit"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </button>
+            </div>
+            <ul className="profile-chip-row" aria-label="Profile summary">
+              {profileSummaryItems(profile).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="profile-scope-note">
+              <CircleHelp size={14} aria-hidden="true" />
+              Academic inputs drive the range. Major, home state, and activities
+              help planning and Fit Finder context.
+            </p>
+          </div>
+        ) : (
+          <>
         <div className="profile-grid">
           <div className="field-pair">
             <label className="control">
@@ -817,7 +1049,7 @@ function ProfilePanel({
                 value={profile.homeState}
                 onChange={(event) => update("homeState", event.target.value)}
               />
-              <span className="helper">Can shift public-school odds. Not yet in the model.</span>
+              <span className="helper">Planning context.</span>
             </label>
           </div>
 
@@ -839,7 +1071,7 @@ function ProfilePanel({
                 Test-optional
               </button>
             </div>
-            <span className="helper">Test-optional shows the widened band.</span>
+            <span className="helper">Test-optional may widen the band.</span>
           </div>
 
           <div className="field-pair">
@@ -859,7 +1091,7 @@ function ProfilePanel({
               {fieldErrors.sat ? (
                 <FieldError text={fieldErrors.sat} />
               ) : (
-                <span className="helper">Out of 1600. Admira uses your stronger score.</span>
+                <span className="helper">Out of 1600.</span>
               )}
             </label>
             <label className="control">
@@ -901,7 +1133,7 @@ function ProfilePanel({
                 Early
               </button>
             </div>
-            <span className="helper">Early can lift published rates where the spread is real.</span>
+            <span className="helper">Early is used where a real spread exists.</span>
           </div>
 
           <label className="control">
@@ -912,7 +1144,7 @@ function ProfilePanel({
               value={profile.intendedMajor}
               onChange={(event) => update("intendedMajor", event.target.value)}
             />
-            <span className="helper">Collected for planning; not yet used by the model.</span>
+            <span className="helper">Used for Fit Finder context.</span>
           </label>
 
           <label className="control">
@@ -927,7 +1159,7 @@ function ProfilePanel({
               onChange={(event) => update("activityNote", event.target.value)}
             />
             <span className="helper">
-              Context only. This is not in the model yet, so it never changes your range.
+              Context for planning, not scoring.
             </span>
           </label>
         </div>
@@ -952,10 +1184,12 @@ function ProfilePanel({
             <Check size={15} aria-hidden="true" />
             Your inputs never train the model.
           </span>
-          <button type="button" className="profile-save" onClick={onSave}>
+          <button type="button" className="profile-save" onClick={handleSave}>
             Save profile
           </button>
         </div>
+          </>
+        )}
       </div>
     </section>
   );
@@ -1416,6 +1650,11 @@ function FitResultCard({
     act_75: null,
     test_policy: null,
   };
+  const verdict = buildFitVerdict(result);
+  const displayLevers = visibleLevers(result.climb_levers ?? []);
+  const detailsDisclaimers = filteredDisclaimers([
+    "Fit uses published attributes only; social fit and campus culture need your own visit or research.",
+  ]);
 
   function handleAddSchool() {
     trackEvent("fit_school_added", {
@@ -1451,6 +1690,8 @@ function FitResultCard({
         </button>
       </div>
 
+      <p className="result-verdict">{verdict}</p>
+
       <div className="fit-card-flow">
         {result.fit_score ? <FitScorePanel fitScore={result.fit_score} /> : null}
         <section className="fit-range-block">
@@ -1466,7 +1707,7 @@ function FitResultCard({
             low={result.probability.low}
             high={result.probability.high}
             point={result.probability.calibrated}
-            label={`${result.school.name} admission prior interval`}
+            label={`${result.school.name} honest range`}
             coverage={result.probability.coverage}
             showMarkerValue={false}
           />
@@ -1477,26 +1718,36 @@ function FitResultCard({
             label={result.band.label}
           />
         </section>
-        <FitExplanation explanation={explanation} />
-        <WideRangeCallout />
-        {result.climb_levers ? (
-          <ClimbLeversPanel levers={result.climb_levers} />
+        {displayLevers.length > 0 ? (
+          <ClimbLeversPanel levers={displayLevers} />
         ) : null}
         <CannotSeePanel />
+        <details className="result-details">
+          <summary>
+            <span>Why this range / details</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </summary>
+          <div className="result-details-body">
+            <FitExplanation explanation={explanation} />
+            <div className="fit-reason-grid">
+              <FitReasonList title="Matched" items={result.match_reasons.matched} />
+              <FitReasonList title="Notable" items={result.match_reasons.notable} />
+            </div>
+            <ShareableRangeCard
+              schoolName={result.school.name}
+              verdict={verdict}
+              low={result.probability.low}
+              high={result.probability.high}
+              band={result.band.label}
+            />
+            <div className="cost-note" data-status={result.match_reasons.cost_status}>
+              <strong>Cost status: {formatCostStatus(result.match_reasons.cost_status)}</strong>
+              <span>Published cost only. Merit aid is not predicted.</span>
+            </div>
+            <DisclaimerPanel disclaimers={detailsDisclaimers} />
+          </div>
+        </details>
       </div>
-
-      <div className="fit-reason-grid">
-        <FitReasonList title="Matched" items={result.match_reasons.matched} />
-        <FitReasonList title="Notable" items={result.match_reasons.notable} />
-      </div>
-
-      <div className="cost-note" data-status={result.match_reasons.cost_status}>
-        <strong>Cost status: {formatCostStatus(result.match_reasons.cost_status)}</strong>
-        <span>
-          Published cost only. Merit aid is not predicted.
-        </span>
-      </div>
-
     </article>
   );
 }
@@ -1788,7 +2039,7 @@ function ReachLadder({
     <section
       className="reach-ladder"
       data-testid="reach-ladder"
-      aria-label={`Reach ladder: interval ${formatChanceRange(low, high)}, tick ${formatPercentPrecise(point)}, interval-derived label ${label}.`}
+      aria-label={`Reach ladder: range ${formatChanceRange(low, high)}, marker ${formatPercentPrecise(point)}, label ${label}.`}
     >
       <div className="micro-label">Reach ladder</div>
       <div className="ladder-track" aria-hidden="true">
@@ -1807,19 +2058,7 @@ function ReachLadder({
         <span className="likely">Likely</span>
       </div>
       <p className="scale-caption">
-        Ladder position follows the interval, not a label we picked.
-      </p>
-    </section>
-  );
-}
-
-function WideRangeCallout() {
-  return (
-    <section className="wide-range-callout">
-      <div className="section-kicker">THE RANGE IS WIDE ON PURPOSE</div>
-      <p>
-        Essays, recommendations, and demonstrated interest are not in the model
-        yet. They are the human levers that can narrow a real decision.
+        The ladder follows the range.
       </p>
     </section>
   );
@@ -1828,26 +2067,35 @@ function WideRangeCallout() {
 function ClimbLeversPanel({ levers }: { levers: ClimbLever[] }) {
   return (
     <section className="climb-panel" data-testid="climb-levers">
-      <div>
-        <div className="section-kicker">Climb levers</div>
-        <h4 className="section-title text-[22px]">Real deltas only.</h4>
+      <div className="climb-panel-head">
+        <span className="climb-head-icon" aria-hidden="true">
+          <SlidersHorizontal size={17} />
+        </span>
+        <div>
+          <div className="section-kicker">Next step</div>
+          <h4 className="section-title text-[22px]">
+            See how to move this range
+          </h4>
+        </div>
       </div>
       <div className="climb-list">
         {levers.map((lever) => (
           <div key={lever.id} className="climb-row" data-kind={lever.kind}>
-            <div>
+            <div className="climb-copy">
               <strong>{lever.label}</strong>
-              <p className="helper">{lever.direction}</p>
-              <p className="helper">{lever.note}</p>
+              <span>{leverKindLabel(lever)}</span>
             </div>
+            <span
+              className="climb-meter"
+              aria-label={`${lever.label}: ${formatLeverDelta(lever)}`}
+            >
+              <span
+                className="climb-meter-fill"
+                style={{ width: `${leverImpactWidth(lever)}%` }}
+              />
+            </span>
             <span className="climb-value">
-              {lever.delta
-                ? lever.kind === "published_delta"
-                  ? `${formatDeltaPoints(lever.delta.tick)} published spread`
-                  : `${formatDeltaPoints(lever.delta.low)} to ${formatDeltaPoints(
-                      lever.delta.high,
-                    )} range move`
-                : "direction only"}
+              {formatLeverDelta(lever)}
             </span>
           </div>
         ))}
@@ -1857,14 +2105,26 @@ function ClimbLeversPanel({ levers }: { levers: ClimbLever[] }) {
 }
 
 function CannotSeePanel() {
+  const items = [
+    { label: "Essays", icon: BookOpen },
+    { label: "Recs", icon: FileText },
+    { label: "Interest", icon: MessageCircle },
+  ];
+
   return (
     <section className="cannot-see-panel" data-testid="cannot-see-panel">
       <div className="section-kicker">What Admira can&apos;t see</div>
       <ul className="blind-spot-list" aria-label="Unmodeled application factors">
-        <li>Essays</li>
-        <li>Recommendations</li>
-        <li>Demonstrated interest</li>
+        {items.map(({ label, icon: Icon }) => (
+          <li key={label}>
+            <span className="blind-spot-icon" aria-hidden="true">
+              <Icon size={15} />
+            </span>
+            <span>{label}</span>
+          </li>
+        ))}
       </ul>
+      <p className="blind-spot-caption">That is why the band stays wide.</p>
     </section>
   );
 }
@@ -2134,8 +2394,12 @@ function BalancePanel({ results }: { results: ChanceResponse[] }) {
           <p data-testid="balance-warning" role="status">
             {warning}
           </p>
-          <button type="button" className="profile-save" onClick={focusSearch}>
-            Add a likely
+          <button
+            type="button"
+            className="profile-save balance-cta"
+            onClick={focusSearch}
+          >
+            Balance my list
           </button>
         </section>
       ) : null}
@@ -2211,6 +2475,9 @@ function ResultCard({
 }) {
   const profileConfidence =
     result.band.input_confidence === "low" ? "Low input confidence" : "Standard input";
+  const verdict = buildChanceVerdict(result);
+  const displayLevers = visibleLevers(result.climb_levers ?? fallbackClimbLevers());
+  const detailsDisclaimers = filteredDisclaimers(result.disclaimers);
 
   return (
     <article className="result-card" data-testid="result-card">
@@ -2241,10 +2508,12 @@ function ResultCard({
         </div>
       </div>
 
+      <p className="result-verdict">{verdict}</p>
+
       <section className="range-section" aria-labelledby={`range-${result.school.unitid}`}>
         <div>
           <div className="band-label" id={`range-${result.school.unitid}`}>
-            80% prior interval
+            Our honest range
           </div>
           <div className="range-readout">
             <span className="range-value">
@@ -2253,43 +2522,51 @@ function ResultCard({
             <span className="label-pill">{profileConfidence}</span>
           </div>
         </div>
-        <RangeBand
-          low={result.probability.low}
-          high={result.probability.high}
-          point={result.probability.calibrated}
-          label={`${result.school.name} admission prior interval`}
+          <RangeBand
+            low={result.probability.low}
+            high={result.probability.high}
+            point={result.probability.calibrated}
+          label={`${result.school.name} honest range`}
           coverage={result.probability.coverage}
         />
         <ReachLadder
           low={result.probability.low}
           high={result.probability.high}
           point={result.probability.calibrated}
-          label={result.band.label}
-        />
-        <WideRangeCallout />
-        <p className="scale-caption">{result.band.note}</p>
+            label={result.band.label}
+          />
         {isHighUncertaintyTier(result.school.selectivity_tier) ? (
           <p className="limitation-note" data-testid="sub20-note">
-            <strong>Sub-20 selectivity limit:</strong> at elite and highly
-            selective schools, public data cannot see enough individual
-            application evidence to make a narrow prediction.{" "}
+            <strong>Sub-20 limit:</strong> for very selective schools, public
+            data cannot see enough of one application to make this narrow.{" "}
             <Link href="/methodology">Read the methodology.</Link>
           </p>
         ) : null}
       </section>
 
-      <div className="evidence-grid">
-        <ClimbLeversPanel
-          levers={result.climb_levers ?? fallbackClimbLevers()}
-        />
+      <ClimbLeversPanel levers={displayLevers} />
+      <CannotSeePanel />
 
-        <div className="rubric-grid">
-          <CannotSeePanel />
-          <UnseenPanel items={result.levers.unseen} />
+      <details className="result-details">
+        <summary>
+          <span>Why this range / details</span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </summary>
+        <div className="result-details-body">
+          <p className="detail-note">{result.band.note}</p>
           <RubricPanel result={result} />
-          <DisclaimerPanel disclaimers={result.disclaimers} />
+          <ShareableRangeCard
+            schoolName={result.school.name}
+            verdict={verdict}
+            low={result.probability.low}
+            high={result.probability.high}
+            band={result.band.label}
+          />
+          {detailsDisclaimers.length > 0 ? (
+            <DisclaimerPanel disclaimers={detailsDisclaimers} />
+          ) : null}
         </div>
-      </div>
+      </details>
     </article>
   );
 }
@@ -2314,8 +2591,8 @@ function RangeBand({
   const width = Math.max(1, right - left);
   const pointLeft = clampPercent(point);
   const aria = showMarkerValue
-    ? `${label}: ${Math.round(coverage * 100)} percent prior interval from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)}; marker at ${formatPercentPrecise(point)}.`
-    : `${label}: ${Math.round(coverage * 100)} percent prior interval from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)} with an interior marker.`;
+    ? `${label}: ${Math.round(coverage * 100)} percent honest range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)}; marker at ${formatPercentPrecise(point)}.`
+    : `${label}: ${Math.round(coverage * 100)} percent honest range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)} with an interior marker.`;
 
   return (
     <div
@@ -2338,18 +2615,40 @@ function RangeBand({
   );
 }
 
-function UnseenPanel({ items }: { items: UnseenLever[] }) {
+function ShareableRangeCard({
+  schoolName,
+  verdict,
+  low,
+  high,
+  band,
+}: {
+  schoolName: string;
+  verdict: string;
+  low: number;
+  high: number;
+  band: BandLabel;
+}) {
   return (
-    <section className="unseen-panel">
-      <div className="section-kicker">What we cannot see</div>
-      <ul className="unseen-list">
-        {items.map((item) => (
-          <li key={item.feature}>
-            <strong>{item.label}</strong>
-            <p className="helper">{item.note}</p>
-          </li>
-        ))}
-      </ul>
+    <section
+      className="share-card"
+      aria-label={`${schoolName} shareable range card`}
+    >
+      <div className="share-card-head">
+        <span>
+          <Share2 size={15} aria-hidden="true" />
+          Shareable view
+        </span>
+        <BandPill label={band} />
+      </div>
+      <div className="share-card-main">
+        <span className="micro-label">My honest range</span>
+        <h4>{schoolName}</h4>
+        <strong className="share-range">{formatChanceRange(low, high)}</strong>
+        <p>{verdict}</p>
+      </div>
+      <p className="share-card-note">
+        Admira shows a range, not a guarantee.
+      </p>
     </section>
   );
 }
@@ -2367,11 +2666,11 @@ function RubricPanel({ result }: { result: ChanceResponse }) {
 
   return (
     <section className="rubric-panel">
-      <div className="section-kicker">C7 rubric grounding</div>
+      <div className="section-kicker">What this school values</div>
       {factors.length === 0 ? (
         <p className="helper">
-          C7 seed data is not available for this school yet. The band stays
-          wide rather than pretending those factors are known.
+          No C7 data for this school yet. Admira keeps the band wide rather
+          than guessing.
         </p>
       ) : (
         <ul className="rubric-list">
@@ -2419,24 +2718,51 @@ function GapRow({
   low: number | null;
   high: number | null;
 }) {
-  let copy = "Not enough public band data to compare.";
+  const hasScore = gap.score !== null;
+  const hasRange = hasScore && low !== null && high !== null && high > low;
+  const hasAverage = hasScore && !hasRange && high !== null;
+  const text =
+    hasRange && gap.score !== null
+      ? `${label} ${gap.score} vs ${low}-${high}`
+      : hasAverage && gap.score !== null
+        ? `${label} ${gap.score} vs avg ${high}`
+        : hasScore && gap.score !== null
+          ? `${label} ${gap.score}. No public band yet.`
+          : `${label}: no comparable public data yet.`;
 
-  if (gap.score !== null && gap.gap !== null) {
-    const position =
-      gap.gap > 0.2 ? "above" : gap.gap < -0.2 ? "below" : "near";
-    if (low !== null && high !== null) {
-      copy = `${gap.score} - ${position} this school's middle 50% of ${low}-${high}.`;
-    } else if (high !== null) {
-      copy = `${gap.score} - ${position} the published average of ${high}.`;
-    }
-  } else if (gap.score !== null) {
-    copy = `${gap.score} entered, but this school has no usable public band.`;
-  }
+  const lowValue = low ?? 0;
+  const highValue = high ?? lowValue + 1;
+  const padding = Math.max(1, (highValue - lowValue) * 0.4);
+  const visualMin = lowValue - padding;
+  const visualMax = highValue + padding;
+  const visualSpan = Math.max(1, visualMax - visualMin);
+  const bandLeft = ((lowValue - visualMin) / visualSpan) * 100;
+  const bandWidth = ((highValue - lowValue) / visualSpan) * 100;
+  const markerLeft =
+    gap.score === null
+      ? 50
+      : Math.max(0, Math.min(100, ((gap.score - visualMin) / visualSpan) * 100));
 
   return (
     <div className="gap-row">
       <strong className="mono">{label}</strong>
-      <span className="helper">{copy}</span>
+      <div className="gap-main">
+        <span className="gap-copy">{text}</span>
+        {hasRange ? (
+          <span className="gap-line" aria-hidden="true">
+            <span
+              className="gap-band"
+              style={{ left: `${bandLeft}%`, width: `${bandWidth}%` }}
+            />
+            <span
+              className="gap-marker"
+              style={{ left: `${markerLeft}%` }}
+            />
+          </span>
+        ) : (
+          <span className="helper">Public range not available.</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -2444,7 +2770,7 @@ function GapRow({
 function DisclaimerPanel({ disclaimers }: { disclaimers: string[] }) {
   return (
     <section className="disclaimer-panel">
-      <div className="section-kicker">Disclosures</div>
+      <div className="section-kicker">Data notes</div>
       <ul className="disclaimer-list">
         {disclaimers.map((disclaimer) => (
           <li key={disclaimer} className="disclaimer-line">
@@ -2495,18 +2821,6 @@ function EmptyState({ onPick }: { onPick: (query: string) => void }) {
       <p className="empty-footnote">
         <span className="footnote-dot" aria-hidden="true" />
         Calibrated on real CDS admit data. Ranges, not points.
-      </p>
-    </section>
-  );
-}
-
-function CantSeeBlock() {
-  return (
-    <section className="cant-see-block">
-      <div className="section-kicker chance-kicker">What Admira cannot see</div>
-      <p>
-        Essays, recommendations, and demonstrated interest are not in the model.
-        They are the levers still in your hands.
       </p>
     </section>
   );
