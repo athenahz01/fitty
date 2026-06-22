@@ -2192,8 +2192,9 @@ function FitScorePanel({ fitScore }: { fitScore: FitScore }) {
           You fit the shape, except where it is hardest.
         </h4>
         <p className="helper">
-          FIT is not an admit probability. It is an equal-weight overlap across
-          known radar axes.
+          FIT is not an admit probability. The headline is program and interest
+          fit; the radar breaks every axis out so academics never hide a weak
+          program match.
         </p>
       </div>
       <div className="fit-score-layout">
