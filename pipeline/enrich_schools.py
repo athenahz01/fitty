@@ -104,14 +104,26 @@ SCORECARD_FIELDS = [
     "id",
     "school.name",
     "school.state",
+    "school.ownership",
     "latest.student.size",
     "latest.cost.avg_net_price.overall",
     "latest.cost.attendance.academic_year",
     "latest.earnings.10_yrs_after_entry.median",
     "latest.completion.rate_suppressed.overall",
     "latest.completion.completion_rate_4yr_150nt",
+    # Specific field-of-study titles (4-digit CIP) plus their credential level,
+    # returned by Scorecard as parallel arrays. These give Fit Finder real
+    # program names like "Public Policy Analysis" instead of broad buckets.
+    "latest.programs.cip_4_digit.title",
+    "latest.programs.cip_4_digit.credential.level",
     *[field for _, _, field in PROGRAM_AREA_FIELDS],
 ]
+
+# Scorecard credential.level codes worth keeping for undergraduate program fit.
+# 2 = associate, 3 = bachelor's. Graduate-only credentials are dropped so the
+# program list reflects what an applying undergraduate can study.
+UNDERGRAD_CREDENTIAL_LEVELS = {2, 3}
+MAX_SPECIFIC_PROGRAMS = 24
 
 NORTHEAST_STATES = {"CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"}
 MIDWEST_STATES = {"IL", "IN", "IA", "KS", "MI", "MN", "MO", "NE", "ND", "OH", "SD", "WI"}
@@ -198,6 +210,62 @@ def completion_rate(row: dict[str, Any]) -> float | None:
     return numeric_or_none(row.get("latest.completion.completion_rate_4yr_150nt"))
 
 
+def _clean_title(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = " ".join(str(value).split()).strip()
+    if not text:
+        return None
+    # Title-case ALLCAPS Scorecard titles while leaving normal casing intact.
+    if text.isupper():
+        text = text.title()
+    return text
+
+
+def specific_programs(row: dict[str, Any]) -> list[str] | None:
+    """Deterministic list of specific undergraduate program titles for a school.
+
+    Reads the parallel CIP 4-digit title and credential-level arrays, keeps
+    undergraduate credentials, de-duplicates case-insensitively while preserving
+    first-seen order, and caps the list so the embedded document stays bounded.
+    """
+
+    titles = row.get("latest.programs.cip_4_digit.title")
+    if not isinstance(titles, list):
+        return None
+
+    levels = row.get("latest.programs.cip_4_digit.credential.level")
+    if not isinstance(levels, list):
+        levels = []
+
+    seen: dict[str, str] = {}
+    for index, raw_title in enumerate(titles):
+        title = _clean_title(raw_title)
+        if not title:
+            continue
+        level = integer_or_none(levels[index]) if index < len(levels) else None
+        if level is not None and level not in UNDERGRAD_CREDENTIAL_LEVELS:
+            continue
+        key = title.lower()
+        if key not in seen:
+            seen[key] = title
+        if len(seen) >= MAX_SPECIFIC_PROGRAMS:
+            break
+
+    if not seen:
+        return None
+    return list(seen.values())
+
+
+def control_value(row: dict[str, Any]) -> str | None:
+    ownership = integer_or_none(row.get("school.ownership"))
+    if ownership == 1:
+        return "public"
+    if ownership in (2, 3):
+        return "private"
+    return None
+
+
 def fetch_rows(api_key: str, unitids: list[int], throttle_seconds: float) -> list[dict[str, Any]]:
     session = requests.Session()
     rows: list[dict[str, Any]] = []
@@ -222,6 +290,8 @@ def transform_row(row: dict[str, Any]) -> dict[str, Any]:
         "unitid": int(row["id"]),
         "name": row.get("school.name") or "Unknown school",
         "program_areas": top_program_areas(row),
+        "programs": specific_programs(row),
+        "control": control_value(row),
         "size_band": size_band(row.get("latest.student.size")),
         "region": state_region(row.get("school.state")),
         "net_price_avg": numeric_or_none(row.get("latest.cost.avg_net_price.overall")),
@@ -247,6 +317,8 @@ def upsert_rows(rows: list[dict[str, Any]]) -> None:
 def print_coverage(rows: list[dict[str, Any]], seed_count: int) -> None:
     fields = [
         "program_areas",
+        "programs",
+        "control",
         "size_band",
         "region",
         "net_price_avg",

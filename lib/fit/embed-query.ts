@@ -1,7 +1,10 @@
 import "server-only";
 
 import { EMBEDDING_DIM, EMBEDDING_MODEL_ID } from "./embedding-model";
+import { buildFitQueryDocument } from "./query-document";
 import type { FitRequest } from "./schema";
+
+export { buildFitQueryDocument };
 
 type TensorLike = {
   tolist: () => unknown;
@@ -20,14 +23,6 @@ type TransformersModule = {
 };
 
 let extractorPromise: Promise<FeatureExtractor> | null = null;
-
-function normalizedText(value: string | undefined) {
-  return value?.replace(/\s+/g, " ").trim() || undefined;
-}
-
-function normalizedLabel(value: string | undefined) {
-  return normalizedText(value)?.replace(/_/g, " ").toLowerCase();
-}
 
 function getExtractor() {
   if (!extractorPromise) {
@@ -59,49 +54,6 @@ function vectorFromTensor(output: TensorLike) {
   }
 
   return vector;
-}
-
-export function buildFitQueryDocument(input: FitRequest) {
-  const sentences = ["Student fit query."];
-  const descriptorParts = [];
-  const size = normalizedLabel(input.preferred_size);
-  const setting = normalizedLabel(input.preferred_setting);
-
-  if (size) {
-    descriptorParts.push(size);
-  }
-  if (setting) {
-    descriptorParts.push(setting);
-  }
-
-  const region = normalizedText(input.preferred_region);
-  const descriptor = descriptorParts.join(" ");
-  if (descriptor && region) {
-    sentences.push(`Prefers a ${descriptor} school in the ${region}.`);
-  } else if (descriptor) {
-    sentences.push(`Prefers a ${descriptor} school.`);
-  } else if (region) {
-    sentences.push(`Prefers a school in the ${region}.`);
-  }
-
-  const programParts = [
-    normalizedText(input.intended_major),
-    normalizedText(input.interests),
-  ].filter(Boolean);
-  if (programParts.length > 0) {
-    sentences.push(`Programs: ${programParts.join(", ")}.`);
-  }
-
-  const learningStyle = normalizedText(input.learning_style_notes);
-  if (learningStyle) {
-    sentences.push(`Learning style: ${learningStyle}.`);
-  }
-
-  if (input.cost_ceiling !== undefined) {
-    sentences.push(`Costs: published cost ceiling $${Math.round(input.cost_ceiling)}.`);
-  }
-
-  return sentences.join(" ");
 }
 
 export async function embedFitDocuments(documents: string[]) {

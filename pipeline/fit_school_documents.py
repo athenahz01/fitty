@@ -15,6 +15,8 @@ FIT_FINDER_COLUMNS = [
     "test_policy",
     "selectivity_tier",
     "program_areas",
+    "programs",
+    "control",
     "size_band",
     "region",
     "net_price_avg",
@@ -87,11 +89,14 @@ def build_school_document(row: dict[str, Any]) -> str:
     name = normalized_text(row.get("name")) or f"School {row.get('unitid')}"
     sentences = [f"{name}."]
 
+    control = normalized_label(row.get("control"))
     size_band = normalized_label(row.get("size_band"))
     setting = normalized_label(row.get("setting"))
     region = normalized_text(row.get("region"))
     location_parts = []
 
+    if control:
+        location_parts.append(control)
     if size_band:
         location_parts.append(size_band)
     if setting:
@@ -105,9 +110,16 @@ def build_school_document(row: dict[str, Any]) -> str:
     elif region:
         sentences.append(f"School in the {region}.")
 
+    # Specific field-of-study titles carry the strongest program signal, so they
+    # lead the academic description; the broad Scorecard buckets stay as a
+    # coarse backstop.
+    programs = clean_program_areas(row.get("programs"))
+    if programs:
+        sentences.append(f"Fields of study: {', '.join(programs)}.")
+
     program_areas = clean_program_areas(row.get("program_areas"))
     if program_areas:
-        sentences.append(f"Programs: {', '.join(program_areas)}.")
+        sentences.append(f"Program areas: {', '.join(program_areas)}.")
 
     selectivity = normalized_label(row.get("selectivity_tier"))
     test_policy = normalized_label(row.get("test_policy"))
