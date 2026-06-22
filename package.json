@@ -14,7 +14,8 @@
     "verify:rls": "node --conditions react-server --import tsx pipeline/verify_rls.ts",
     "fit:enrich": "python pipeline/enrich_schools.py",
     "fit:embed": "python pipeline/embed_schools.py",
-    "fit:embedding-sanity": "python pipeline/check_embedding_sanity.py"
+    "fit:embedding-sanity": "python pipeline/check_embedding_sanity.py",
+    "fit:eval": "node --import tsx pipeline/eval_fit.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
