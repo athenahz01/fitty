@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scoreCanadaProgram } from "../canada";
+import { canadaBasisError, scoreCanadaProgram } from "../canada";
 import { driversAreConsistent } from "../drivers";
 import { toHeadlineScore } from "../headline";
 import { tierFromProbability } from "../tiers";
@@ -130,6 +130,31 @@ describe("Canada deterministic scorer", () => {
         program: caProgram,
       }),
     ).toThrow(/Cannot compare/);
+  });
+
+  it("flags a basis mismatch as a 400 message instead of letting the scorer throw", () => {
+    // M2: route uses this to return 400 (not an unhandled 500) when the
+    // applicant basis does not match the program's native cutoff basis.
+    const message = canadaBasisError("gpa_4_0", caProgram);
+    expect(message).toContain("percentage");
+    expect(message).toContain("gpa_4_0");
+
+    // The default applicant_basis ("percentage") against an R-score program
+    // is also a mismatch, not a silent cross-basis comparison.
+    expect(
+      canadaBasisError("percentage", {
+        ...caProgram,
+        cutoff_basis: "cegep_r_score",
+      }),
+    ).toContain("cegep_r_score");
+
+    // A matching basis is safe to score.
+    expect(canadaBasisError("percentage", caProgram)).toBeNull();
+
+    // A program with no loaded basis is reported, never scored.
+    expect(
+      canadaBasisError("percentage", { ...caProgram, cutoff_basis: null }),
+    ).toContain("no cutoff basis");
   });
 
   it("tempers broad-based programs without breaking the cutoff tier flip", () => {

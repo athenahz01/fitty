@@ -72,6 +72,64 @@ describe("Profile Studio axes", () => {
     }
   });
 
+  it("derives a per-school admitted reference that differs when school data differs", () => {
+    const request = {
+      unitid: 1,
+      sat_score: 1450,
+      act_score: 33,
+      gpa: 3.9,
+      application_round: "regular" as const,
+      intended_major: "Computer Science",
+      activity_context: "Robotics captain and research internship.",
+    };
+    const baseSchool = {
+      name: "Test School",
+      sat_25: 1400,
+      sat_75: 1520,
+      act_25: 32,
+      act_75: 35,
+      gpa_avg: 3.85,
+      test_policy: "required" as const,
+      c7_factors: { rigor: "Very Important" as const },
+    };
+
+    const elite = buildUsProfileStudio({
+      request,
+      school: { ...baseSchool, unitid: 1, selectivity_tier: "elite" },
+    });
+    const accessible = buildUsProfileStudio({
+      request,
+      school: { ...baseSchool, unitid: 2, selectivity_tier: "accessible" },
+    });
+    const noTier = buildUsProfileStudio({
+      request,
+      school: { ...baseSchool, unitid: 3, selectivity_tier: null },
+    });
+
+    const academicsRef = (studio: ReturnType<typeof buildUsProfileStudio>) =>
+      studio.axes.find((axis) => axis.key === "academics");
+
+    // Real per-school lineage: a different selectivity tier yields a different
+    // derived reference, not one constant for every school.
+    expect(academicsRef(elite)?.admitted).not.toEqual(
+      academicsRef(accessible)?.admitted,
+    );
+    expect(academicsRef(elite)?.reference_basis).toBe("derived");
+    expect(academicsRef(accessible)?.reference_basis).toBe("derived");
+
+    // No tier loaded => labeled guide rail, never presented as derived data.
+    expect(academicsRef(noTier)?.reference_basis).toBe("guide_rail");
+    expect(academicsRef(noTier)?.note).toContain("guide rail");
+
+    // Nothing claims "admitted-student bands" anymore.
+    for (const studio of [elite, accessible, noTier]) {
+      expect(studio.method.toLowerCase()).not.toContain("admitted-student");
+      for (const axis of studio.axes) {
+        expect(axis.note.toLowerCase()).not.toContain("admitted-student");
+      }
+    }
+  });
+
   it("builds Canada axes from native cutoff and prerequisite data", () => {
     const program = {
       program_name: "Computer Science",

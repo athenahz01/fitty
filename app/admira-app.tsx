@@ -822,6 +822,9 @@ export function AdmiraApp() {
     useState<FitFinderStatus>("checking");
   const [admitIntelligenceStatus, setAdmitIntelligenceStatus] =
     useState<AdmitIntelligenceStatus>("checking");
+  const [listBuilderStatus, setListBuilderStatus] = useState<
+    "checking" | "enabled" | "disabled"
+  >("checking");
   const searchRequest = useRef(0);
 
   const profileErrors = useMemo(() => validateProfile(profile), [profile]);
@@ -868,8 +871,26 @@ export function AdmiraApp() {
       }
     }
 
+    async function loadListBuilderStatus() {
+      try {
+        const response = await fetch("/api/list/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setListBuilderStatus(
+          payload?.enabled === true ? "enabled" : "disabled",
+        );
+      } catch {
+        if (active) {
+          setListBuilderStatus("disabled");
+        }
+      }
+    }
+
     void loadAdmitIntelligenceStatus();
     void loadFitFinderStatus();
+    void loadListBuilderStatus();
 
     return () => {
       active = false;
@@ -1121,6 +1142,9 @@ export function AdmiraApp() {
                 onAddSchool={addSchool}
                 addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
               />
+            ) : null}
+            {listBuilderStatus === "enabled" ? (
+              <ListBuilderPanel profile={profile} setProfile={setProfile} />
             ) : null}
             <SchoolSearchPanel
               query={schoolQuery}
@@ -1535,6 +1559,297 @@ function FieldError({ text }: { text: string }) {
       <AlertTriangle size={13} aria-hidden="true" />
       {text}
     </span>
+  );
+}
+
+type ListBucket = "reach" | "target" | "safety";
+
+type ListShape = { reach: number; target: number; safety: number };
+
+type ListSchoolView = {
+  unitid: number;
+  name: string;
+  tier: string;
+  bucket: ListBucket;
+  fit: number | null;
+  net_cost: number | null;
+  affordable: boolean | null;
+  rationale: string;
+};
+
+type ListBuilderResponse = {
+  list: ListSchoolView[];
+  overlooking: ListSchoolView[];
+  objective: {
+    weights: { fit: number; cost: number };
+    shape: ListShape;
+    description: string;
+    method: string;
+  };
+  balance: { reach: number; target: number; safety: number; note: string };
+  excluded: { canada: number };
+};
+
+function ListSchoolCard({ school }: { school: ListSchoolView }) {
+  return (
+    <li
+      className="list-school flex flex-col gap-1 rounded-xl border border-black/10 p-4 dark:border-white/10"
+      data-testid="list-school"
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <Link
+          href={`/schools/${school.unitid}`}
+          className="text-base font-semibold hover:underline"
+        >
+          {school.name}
+        </Link>
+        <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-medium dark:bg-white/10">
+          {school.tier}
+        </span>
+      </div>
+      <p className="text-sm opacity-75">{school.rationale}</p>
+      <div className="mt-1 flex flex-wrap gap-3 text-xs opacity-60">
+        <span>FIT {school.fit ?? "—"}</span>
+        <span>
+          Net price{" "}
+          {school.net_cost === null
+            ? "not published"
+            : `$${school.net_cost.toLocaleString("en-US")}`}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function ShapeSlider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 text-sm">
+      <span className="w-16 shrink-0">{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={8}
+        step={1}
+        value={value}
+        aria-label={`${label} count`}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="flex-1"
+      />
+      <span className="w-5 text-right tabular-nums">{value}</span>
+    </label>
+  );
+}
+
+const initialShape: ListShape = { reach: 3, target: 4, safety: 3 };
+
+function ListBuilderPanel({
+  profile,
+  setProfile,
+}: {
+  profile: Profile;
+  setProfile: Dispatch<SetStateAction<Profile>>;
+}) {
+  const [interests, setInterests] = useState("");
+  const [budget, setBudget] = useState("");
+  const [shape, setShape] = useState<ListShape>(initialShape);
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [error, setError] = useState("");
+  const [response, setResponse] = useState<ListBuilderResponse | null>(null);
+  const generated = useRef(false);
+
+  async function generate(nextShape: ListShape = shape, nextBudget = budget) {
+    setStatus("loading");
+    setError("");
+    try {
+      const httpResponse = await fetch("/api/list/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: {
+            sat_score: profile.notSubmittingTests
+              ? undefined
+              : numberOrUndefined(profile.sat),
+            act_score: profile.notSubmittingTests
+              ? undefined
+              : numberOrUndefined(profile.act),
+            gpa: numberOrUndefined(profile.gpa),
+            application_round: profile.applicationRound,
+          },
+          preferences: {
+            intended_major: profile.intendedMajor || undefined,
+            interests: interests || undefined,
+            budget: numberOrUndefined(nextBudget),
+            shape: nextShape,
+          },
+        }),
+      });
+      const payload = await httpResponse.json();
+      if (!httpResponse.ok) {
+        throw new Error(payload?.error ?? "List request failed.");
+      }
+      setResponse(payload as ListBuilderResponse);
+      setStatus("ready");
+      generated.current = true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "List request failed.");
+      setStatus("error");
+    }
+  }
+
+  // Live re-balance: once a list exists, dragging a shape slider or changing the
+  // budget regenerates against the same deterministic engine.
+  function adjustShape(bucket: ListBucket, value: number) {
+    const next = { ...shape, [bucket]: value };
+    setShape(next);
+    if (generated.current) {
+      void generate(next, budget);
+    }
+  }
+
+  function adjustBudget(value: string) {
+    setBudget(value);
+    if (generated.current) {
+      void generate(shape, value);
+    }
+  }
+
+  return (
+    <section
+      className="list-builder-panel rounded-2xl border border-black/10 p-5 dark:border-white/10"
+      data-testid="list-builder-panel"
+    >
+      <header className="mb-4">
+        <div className="text-xs uppercase tracking-wide opacity-60">
+          Smart List Builder
+        </div>
+        <h3 className="text-2xl font-bold tracking-tight">
+          One tap to a balanced list
+        </h3>
+        <p className="mt-1 text-sm opacity-70">
+          An auto-balanced reach / target / safety list with an honest one-line
+          reason per school. Tiers come straight from Admit Intelligence.
+        </p>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="opacity-70">Intended major</span>
+          <input
+            className="rounded-lg border border-black/15 bg-transparent px-3 py-2 dark:border-white/15"
+            value={profile.intendedMajor}
+            onChange={(event) =>
+              setProfile((current) => ({
+                ...current,
+                intendedMajor: event.target.value,
+              }))
+            }
+            placeholder="Computer Science"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="opacity-70">Interests</span>
+          <input
+            className="rounded-lg border border-black/15 bg-transparent px-3 py-2 dark:border-white/15"
+            value={interests}
+            onChange={(event) => setInterests(event.target.value)}
+            placeholder="machine learning, robotics"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="opacity-70">Net price budget (USD)</span>
+          <input
+            className="rounded-lg border border-black/15 bg-transparent px-3 py-2 dark:border-white/15"
+            value={budget}
+            inputMode="numeric"
+            onChange={(event) => adjustBudget(event.target.value)}
+            placeholder="30000"
+            aria-label="Net price budget"
+          />
+        </label>
+        <div className="flex flex-col justify-end gap-1.5">
+          <ShapeSlider
+            label="Reach"
+            value={shape.reach}
+            onChange={(value) => adjustShape("reach", value)}
+          />
+          <ShapeSlider
+            label="Target"
+            value={shape.target}
+            onChange={(value) => adjustShape("target", value)}
+          />
+          <ShapeSlider
+            label="Safety"
+            value={shape.safety}
+            onChange={(value) => adjustShape("safety", value)}
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="mt-4 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-black"
+        onClick={() => generate()}
+        disabled={status === "loading"}
+        data-testid="list-builder-generate"
+      >
+        {status === "loading"
+          ? "Balancing…"
+          : generated.current
+            ? "Rebuild list"
+            : "Build my list"}
+      </button>
+
+      {status === "error" ? (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+      ) : null}
+
+      {response ? (
+        <div className="mt-6" data-testid="list-builder-results">
+          <p className="text-sm opacity-70" data-testid="list-balance">
+            {response.balance.reach} reach · {response.balance.target} target ·{" "}
+            {response.balance.safety} safety
+          </p>
+
+          <ul className="mt-3 space-y-2">
+            {response.list.map((school) => (
+              <ListSchoolCard key={school.unitid} school={school} />
+            ))}
+          </ul>
+
+          {response.overlooking.length > 0 ? (
+            <div className="mt-6" data-testid="list-overlooking">
+              <h4 className="text-sm font-semibold uppercase tracking-wide opacity-60">
+                Schools you&apos;re overlooking
+              </h4>
+              <ul className="mt-2 space-y-2">
+                {response.overlooking.map((school) => (
+                  <ListSchoolCard key={school.unitid} school={school} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <details className="mt-6 text-xs opacity-70">
+            <summary className="cursor-pointer">How this list is ordered</summary>
+            <p className="mt-2">{response.objective.description}</p>
+            <p className="mt-1">
+              Weights — fit {response.objective.weights.fit}, cost{" "}
+              {response.objective.weights.cost}.
+            </p>
+          </details>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -3620,7 +3935,7 @@ function ProfileStudioRadar({ axes }: { axes: AdmitProfileAxis[] }) {
           <PolarAngleAxis dataKey="axis" tick={{ fontSize: 12 }} />
           <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
           <Radar
-            name="Admitted reference"
+            name="School reference"
             dataKey="admitted"
             stroke="var(--school-indigo)"
             fill="transparent"

@@ -107,6 +107,24 @@ function driver(
   };
 }
 
+// Pure basis-compatibility check shared by the route. Returns a user-facing
+// 400 message when the applicant's basis cannot be compared to the program's
+// native cutoff basis (or no basis is loaded), or null when scoring is safe.
+// The route returns 400 with this message; scoreCanadaProgram keeps its own
+// throw as defense-in-depth.
+export function canadaBasisError(
+  applicantBasis: GradingBasis,
+  program: Pick<CanadaProgramRequirement, "cutoff_basis" | "program_name">,
+): string | null {
+  if (!program.cutoff_basis) {
+    return `This program ("${program.program_name}") has no cutoff basis loaded, so it cannot be scored yet.`;
+  }
+  if (applicantBasis !== program.cutoff_basis) {
+    return `This program is scored on ${program.cutoff_basis}; resubmit applicant_average in that basis (sent ${applicantBasis}).`;
+  }
+  return null;
+}
+
 export function scoreCanadaProgram(input: CanadaScoreInput): CanadaScoreResult {
   assertFinite(input.applicantAverage, "applicant average");
 

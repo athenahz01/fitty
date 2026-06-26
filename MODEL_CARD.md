@@ -56,6 +56,69 @@ For Canadian programs, Phase 1 uses `program_requirements` rows directly. Applic
 
 Profile Studio axes are deterministic support views, not separate admit probabilities. The five axes are Academics, Rigor, Test, Extracurricular Impact, and Fit. The `confidence` field is a texture for UI display based on available public-data width or Canada row completeness; it is not calibrated applicant-level certainty.
 
+## Phase 2 School Universe & Smart List Builder
+
+Phase 2 adds two surfaces, each behind its own off-by-default flag, and neither
+introduces a new admit model — both reuse the Phase 1 engine and the Fit Finder
+embeddings so a school's tier and fit are identical everywhere they appear.
+
+### Smart List Builder (`ADMIRA_LIST_BUILDER_ENABLED`, default false)
+
+`lib/list-builder` is a pure, deterministic module. Given a profile, preferences,
+and a candidate pool it returns an auto-balanced reach/target/safety list. The
+**objective function is the only thing that drives order**:
+
+`desirability(school) = W_FIT * (fit / 100) + W_COST * affordability`
+
+with `W_FIT = 0.7`, `W_COST = 0.3` (exported constants, identical for every
+school). `fit` is the Fit Finder hybrid program-fit (keyword + embedding), and
+`affordability` is `1` when no budget is given, `1` when net price ≤ budget,
+`max(0, 1 - over/budget)` when net price exceeds budget, and a neutral `0.6`
+when a budget is given but the school publishes no net price. There is **no
+per-school boost, no sponsored weight, and no hardcoded "preferred" school**. Two
+schools with equal desirability are ordered by `unitid` ascending — a stable
+tie-break, never a quality signal — so the order is reproducible by hand.
+
+Tiers are **not recomputed**: each US school's tier is
+`tierFromProbability(calibrated)` on the same public-prior chance the
+`/api/admit-intelligence` route returns, so the list tier equals the
+admit-intelligence tier for the same profile/school. The four engine tiers fold
+into three buckets (Reach→reach, Target→target, Likely|Safety→safety); the list
+keeps the top schools per bucket (default 3 reach / 4 target / 3 safety) so it
+spreads across tiers instead of collapsing. A "schools you're overlooking" row
+surfaces affordable, genuinely-fitting schools that missed the cut, biased toward
+under-filled tiers — fit/data-driven, never random.
+
+Net cost is `net_price_avg` only; when it is absent the list says so and never
+substitutes sticker price or invents a number. **Merit/predicted aid is Phase 4
+and is deliberately absent.** Outcome data (earnings, completion) is never fed
+into ranking (leakage). Each one-line rationale is generated from that row's real
+computed tier + fit + net cost, so every claim is checkable against the data.
+
+Canada is **out of scope for the list this round**: CA admit scoring needs a
+per-program native-basis average that the list flow does not collect, so CA rows
+are excluded and counted, gated behind `ADMIRA_CANADA_ENABLED` for a later
+increment. The engine never scores CA schools with US assumptions.
+
+### School Universe (`ADMIRA_UNIVERSE_ENABLED`, default false)
+
+`lib/universe` assembles one school's row + its `program_requirements` + its Fit
+Finder embedding neighbors into a single view. Every figure carries an internal
+`source` lineage label (Scorecard / IPEDS / CDS / `program_requirements`), and a
+missing figure is reported as missing with an honest note rather than estimated.
+
+### Phase 1 remediation folded in
+
+Profile Studio (`lib/profile`) no longer presents hardcoded constants as
+admitted-student bands. Each axis' reference is now derived per-school from that
+school's published signals (selectivity tier, middle-50 bands, CDS C7 ratings, or
+the Canadian program cutoff) and carries a `reference_basis` of `derived` or
+`guide_rail`; where no signal exists it falls back to a labeled generic guide
+rail and the note says so. The previously over-claimed Fit and Extracurricular
+axes are now labeled plainly as heuristics. The `/api/admit-intelligence` route
+returns a 400 (not a 500) when the applicant basis does not match a Canadian
+program's native `cutoff_basis`.
+
 ## Intended Use
 
 This model is for decision support and product-contract validation. It can say, in a public-data-prior sense, where a student sits relative to a school's published bands and how much uncertainty remains. It must not be used as an oracle or as a claim that Admira can predict real individual outcomes from public data alone.

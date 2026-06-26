@@ -4,6 +4,7 @@ import { z } from "zod";
 import { canadaEnabled } from "@/lib/geo/server";
 import { buildCanadaProfileStudio } from "@/lib/profile";
 import {
+  canadaBasisError,
   findCanadaProgram,
   scoreCanadaProgram,
   type CanadaProgramRequirement,
@@ -147,6 +148,17 @@ export async function POST(request: Request) {
         { error: "No Canadian program requirement row is loaded for this school." },
         { status: 404 },
       );
+    }
+
+    // Validate the basis here so a user-input mismatch is a clean 400 rather
+    // than an unhandled throw from the scorer (which would surface as a 500).
+    // The scorer keeps its own throw as defense-in-depth.
+    const basisError = canadaBasisError(
+      parsed.data.applicant_basis as GradingBasis,
+      program,
+    );
+    if (basisError) {
+      return NextResponse.json({ error: basisError }, { status: 400 });
     }
 
     const result = scoreCanadaProgram({
