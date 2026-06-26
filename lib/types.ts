@@ -1,5 +1,16 @@
 export type TestPolicy = "required" | "optional" | "blind" | "unknown";
 
+export type Country = "US" | "CA";
+
+export type AdmissionSystem =
+  | "common_app"
+  | "coalition"
+  | "ouac"
+  | "direct"
+  | "quebec_cegep";
+
+export type GradingBasis = "gpa_4_0" | "percentage" | "cegep_r_score";
+
 export type SelectivityTier =
   | "elite"
   | "highly_selective"
@@ -36,6 +47,12 @@ export type School = {
   unitid: number;
   name: string;
   state: string | null;
+  country: Country;
+  province_state: string | null;
+  admission_system: AdmissionSystem | null;
+  grading_basis: GradingBasis;
+  broad_based_admission: boolean;
+  merit_auto: Record<string, unknown> | null;
   setting: "city" | "suburb" | "town" | "rural" | null;
   size: number | null;
   admit_rate: number | null;
@@ -60,6 +77,22 @@ export type School = {
   completion_rate: number | null;
   embedding: number[] | null;
   updated_at: string;
+};
+
+export type ProgramRequirement = {
+  id: string;
+  unitid: number;
+  program_name: string;
+  system: AdmissionSystem | null;
+  cutoff_avg_low: number | null;
+  cutoff_avg_high: number | null;
+  cutoff_basis: GradingBasis | null;
+  prerequisites: unknown[] | Record<string, unknown> | null;
+  test_policy: TestPolicy | null;
+  supplemental_app: boolean;
+  broad_based_admission: boolean;
+  source_url: string;
+  ingested_at: string;
 };
 
 export type ConsentRecord = {
@@ -130,6 +163,12 @@ export type Database = {
           | "program_areas"
           | "programs"
           | "control"
+          | "country"
+          | "province_state"
+          | "admission_system"
+          | "grading_basis"
+          | "broad_based_admission"
+          | "merit_auto"
           | "size_band"
           | "region"
           | "net_price_avg"
@@ -145,6 +184,12 @@ export type Database = {
               | "program_areas"
               | "programs"
               | "control"
+              | "country"
+              | "province_state"
+              | "admission_system"
+              | "grading_basis"
+              | "broad_based_admission"
+              | "merit_auto"
               | "size_band"
               | "region"
               | "net_price_avg"
@@ -156,6 +201,22 @@ export type Database = {
           >;
         Update: Partial<Omit<School, "unitid">>;
         Relationships: [];
+      };
+      program_requirements: {
+        Row: ProgramRequirement;
+        Insert: Omit<ProgramRequirement, "id" | "ingested_at"> & {
+          id?: string;
+          ingested_at?: string;
+        };
+        Update: Partial<Omit<ProgramRequirement, "id">>;
+        Relationships: [
+          {
+            foreignKeyName: "program_requirements_unitid_fkey";
+            columns: ["unitid"];
+            referencedRelation: "schools";
+            referencedColumns: ["unitid"];
+          },
+        ];
       };
       consent_records: {
         Row: ConsentRecord;
@@ -207,6 +268,7 @@ export type Database = {
           p_preferred_size?: SchoolSizeBand | null;
           p_preferred_setting?: School["setting"];
           p_cost_ceiling?: number | null;
+          p_include_canada?: boolean;
         };
         Returns: Array<
           Pick<
@@ -214,6 +276,11 @@ export type Database = {
             | "unitid"
             | "name"
             | "state"
+            | "province_state"
+            | "country"
+            | "admission_system"
+            | "grading_basis"
+            | "broad_based_admission"
             | "setting"
             | "size"
             | "admit_rate"

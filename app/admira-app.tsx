@@ -28,7 +28,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
 import { searchLocalSchoolFixtures } from "@/lib/school-fixtures";
-import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { searchSchools, type SchoolSearchResult } from "@/lib/school-search";
 
 import { OutcomeDataControlsPanel } from "./outcome-data-controls";
 import { OutcomeCapturePanel } from "./outcome-capture-panel";
@@ -48,17 +48,7 @@ type Profile = {
   activityNote: string;
 };
 
-type SchoolSearchRow = {
-  unitid: number;
-  name: string;
-  state: string | null;
-  selectivity_tier: string | null;
-  sat_25: number | null;
-  sat_75: number | null;
-  act_25: number | null;
-  act_75: number | null;
-  test_policy: string | null;
-};
+type SchoolSearchRow = SchoolSearchResult;
 
 type ChanceResponse = {
   school: {
@@ -191,6 +181,8 @@ type FitResult = {
   school: {
     unitid: number;
     name: string;
+    country: "US" | "CA";
+    province_state: string | null;
     region: string | null;
     size_band: string | null;
     setting: string | null;
@@ -319,6 +311,16 @@ function formatSignedPoints(value: number) {
 
 function formatRoundLabel(round: ApplicationRound) {
   return round === "early" ? "Early" : "Regular";
+}
+
+function schoolLocationLabel(
+  school: Pick<SchoolSearchRow, "country" | "province_state" | "state">,
+) {
+  return (
+    school.province_state ??
+    school.state ??
+    (school.country === "CA" ? "Province unknown" : "State unknown")
+  );
 }
 
 function bandPhrase(label: BandLabel) {
@@ -747,25 +749,12 @@ export function AdmiraApp() {
           return;
         }
 
-        const supabase = createSupabaseBrowserClient();
-        const { data, error } = await supabase
-          .from("schools")
-          .select(
-            "unitid,name,state,selectivity_tier,sat_25,sat_75,act_25,act_75,test_policy",
-          )
-          .ilike("name", `%${query}%`)
-          .order("name", { ascending: true })
-          .limit(8);
-
+        const results = await searchSchools(query);
         if (requestId !== searchRequest.current) {
           return;
         }
 
-        if (error) {
-          throw error;
-        }
-
-        setSchoolResults(data ?? []);
+        setSchoolResults(results);
         setSchoolSearchStatus("ready");
         setSchoolSearchError("");
       } catch (error) {
@@ -1935,7 +1924,9 @@ function FitResultCard({
   const schoolForList: SchoolSearchRow = {
     unitid: result.school.unitid,
     name: result.school.name,
-    state: null,
+    state: result.school.province_state,
+    province_state: result.school.province_state,
+    country: result.school.country,
     selectivity_tier: result.school.selectivity_tier,
     sat_25: null,
     sat_75: null,
@@ -3030,7 +3021,7 @@ function SchoolSearchPanel({
                         <span className="search-result-copy">
                           <strong>{school.name}</strong>
                           <span className="helper">
-                            {school.state ?? "State unknown"} &middot;{" "}
+                            {schoolLocationLabel(school)} &middot;{" "}
                             {formatTier(school.selectivity_tier)}
                           </span>
                         </span>

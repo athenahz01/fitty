@@ -1,0 +1,178 @@
+{
+  "version": "v2-phase0-canada-holdout-2026-06-26",
+  "retrieved_at": "2026-06-26T00:00:00+00:00",
+  "basis": "Published Canadian program admission average ranges. Ontario entries use percentage top-six style ranges unless otherwise noted.",
+  "programs": [
+    {
+      "school_name": "University of Waterloo",
+      "program_name": "Computer Science (Regular/Co-op)",
+      "cutoff_avg_low": 90,
+      "cutoff_avg_high": 95,
+      "cutoff_basis": "percentage",
+      "published_text": "Low to Mid-90s",
+      "source_url": "https://www.ouinfo.ca/programs/waterloo/wcs"
+    },
+    {
+      "school_name": "University of Waterloo",
+      "program_name": "Software Engineering",
+      "cutoff_avg_low": 90,
+      "cutoff_avg_high": 95,
+      "cutoff_basis": "percentage",
+      "published_text": "Low to mid-90s",
+      "source_url": "https://uwaterloo.ca/engineering/future-students/applying/admission-requirements"
+    },
+    {
+      "school_name": "University of Waterloo",
+      "program_name": "Computer Engineering",
+      "cutoff_avg_low": 88,
+      "cutoff_avg_high": 92,
+      "cutoff_basis": "percentage",
+      "published_text": "High 80s to low 90s",
+      "source_url": "https://uwaterloo.ca/engineering/future-students/applying/admission-requirements"
+    },
+    {
+      "school_name": "University of Waterloo",
+      "program_name": "Mechanical Engineering",
+      "cutoff_avg_low": 88,
+      "cutoff_avg_high": 92,
+      "cutoff_basis": "percentage",
+      "published_text": "High 80s to low 90s",
+      "source_url": "https://uwaterloo.ca/engineering/future-students/applying/admission-requirements"
+    },
+    {
+      "school_name": "University of Toronto Scarborough",
+      "program_name": "Computer Science (regular and co-op)",
+      "cutoff_avg_low": 94,
+      "cutoff_avg_high": 98,
+      "cutoff_basis": "percentage",
+      "published_text": "Mid-90s (regular); high 90s (co-op)",
+      "source_url": "https://www.ouinfo.ca/programs/toronto-scarborough/txc"
+    },
+    {
+      "school_name": "University of Toronto Mississauga",
+      "program_name": "Computer Science",
+      "cutoff_avg_low": 87,
+      "cutoff_avg_high": 89,
+      "cutoff_basis": "percentage",
+      "published_text": "High 80s",
+      "source_url": "https://www.ouinfo.ca/programs/toronto-mississauga/tmx"
+    },
+    {
+      "school_name": "University of Toronto",
+      "program_name": "Computer Science",
+      "cutoff_avg_low": 90,
+      "cutoff_avg_high": 92,
+      "cutoff_basis": "percentage",
+      "published_text": "Low 90s",
+      "source_url": "https://www.ouinfo.ca/programs/toronto-st-george/tad"
+    },
+    {
+      "school_name": "University of Toronto",
+      "program_name": "Rotman Commerce",
+      "cutoff_avg_low": 85,
+      "cutoff_avg_high": 89,
+      "cutoff_basis": "percentage",
+      "published_text": "Mid to high 80s",
+      "source_url": "https://www.ouinfo.ca/programs/toronto-st-george/tac"
+    },
+    {
+      "school_name": "McMaster University",
+      "program_name": "Engineering Co-op I",
+      "cutoff_avg_low": 87,
+      "cutoff_avg_high": null,
+      "cutoff_basis": "percentage",
+      "published_text": "A minimum of 87% is required for consideration. Admission is by selection.",
+      "source_url": "https://www.ouinfo.ca/programs/mcmaster/mec"
+    },
+    {
+      "school_name": "McMaster University",
+      "program_name": "Business I",
+      "cutoff_avg_low": 85,
+      "cutoff_avg_high": 89,
+      "cutoff_basis": "percentage",
+      "published_text": "Mid- to high-80s",
+      "source_url": "https://www.ouinfo.ca/programs/mcmaster/mb"
+    },
+    {
+      "school_name": "McMaster University",
+      "program_name": "Computer Science I",
+      "cutoff_avg_low": 90,
+      "cutoff_avg_high": null,
+      "cutoff_basis": "percentage",
+      "published_text": "A minimum of 90% is required for consideration.",
+      "source_url": "https://www.ouinfo.ca/programs/mcmaster/mc"
+    },
+    {
+      "school_name": "Queen's University",
+      "program_name": "Commerce",
+      "cutoff_avg_low": 87,
+      "cutoff_avg_high": null,
+      "cutoff_basis": "percentage",
+      "published_text": "87%+",
+      "source_url": "https://www.ouinfo.ca/programs/queens/qc"
+    },
+    {
+      "school_name": "Western University",
+      "program_name": "Computer Science",
+      "cutoff_avg_low": 80,
+      "cutoff_avg_high": 85,
+      "cutoff_basis": "percentage",
+      "published_text": "Low to mid 80s",
+      "source_url": "https://www.ouinfo.ca/programs/western/ecs"
+    },
+    {
+      "school_name": "Western University",
+      "program_name": "Engineering",
+      "cutoff_avg_low": 88,
+      "cutoff_avg_high": 92,
+      "cutoff_basis": "percentage",
+      "published_text": "High 80s to Low 90s",
+      "source_url": "https://www.ouinfo.ca/programs/western/ee"
+    },
+    {
+      "school_name": "University of Guelph",
+      "program_name": "Computer Science (co-op and regular)",
+      "cutoff_avg_low": 85,
+      "cutoff_avg_high": 90,
+      "cutoff_basis": "percentage",
+      "published_text": "85 to 90%",
+      "source_url": "https://www.ouinfo.ca/programs/guelph/gct"
+    },
+    {
+      "school_name": "University of Guelph",
+      "program_name": "Commerce - Management",
+      "cutoff_avg_low": 80,
+      "cutoff_avg_high": 86,
+      "cutoff_basis": "percentage",
+      "published_text": "80 to 86%",
+      "source_url": "https://www.ouinfo.ca/programs/guelph/gbf"
+    },
+    {
+      "school_name": "Toronto Metropolitan University",
+      "program_name": "Computer Science (Honours)",
+      "cutoff_avg_low": 80,
+      "cutoff_avg_high": 83,
+      "cutoff_basis": "percentage",
+      "published_text": "Low 80s",
+      "source_url": "https://www.ouinfo.ca/programs/toronto-metropolitan/sab"
+    },
+    {
+      "school_name": "Wilfrid Laurier University",
+      "program_name": "Computer Science (BA and BSc)",
+      "cutoff_avg_low": 77,
+      "cutoff_avg_high": 79,
+      "cutoff_basis": "percentage",
+      "published_text": "High 70s",
+      "source_url": "https://www.ouinfo.ca/programs/laurier-waterloo/uzg"
+    },
+    {
+      "school_name": "McGill University",
+      "program_name": "Architecture",
+      "cutoff_avg_low": 95.67,
+      "cutoff_avg_high": null,
+      "cutoff_basis": "percentage",
+      "published_text": "Last year's Ontario top-six cut-off: 95.67%",
+      "source_url": "https://www.mcgill.ca/undergraduate-admissions/apply/requirements/ontario"
+    }
+  ]
+}

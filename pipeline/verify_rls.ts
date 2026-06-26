@@ -206,8 +206,17 @@ async function main() {
   const emailA = `${subjectAEmailPrefix}-${runId}@example.com`;
   const emailB = `${subjectBEmailPrefix}-${runId}@example.com`;
   const testUnitid = -Math.floor(100000000 + Math.random() * 800000000);
+  const blockedSchoolUnitid = testUnitid - 1;
   const service = createSupabaseServiceRoleClient();
   const serviceDb = asHarnessDb(service);
+  const anonymousDb = asHarnessDb(
+    createClient<Database>(supabaseUrl, anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }),
+  );
   const results: CheckResult[] = [];
   const createdUserIds: string[] = [];
   let userAId = "";
@@ -230,6 +239,36 @@ async function main() {
       c7_factors: {},
       selectivity_tier: "accessible",
     });
+
+    await runCheck(results, "Anonymous cannot insert public school rows", async () => {
+      await expectRejected(anonymousDb, "schools", {
+        unitid: blockedSchoolUnitid,
+        name: `Admira RLS Blocked School ${runId}`,
+        state: "TS",
+        country: "US",
+        province_state: "TS",
+        setting: "city",
+        size: 1,
+        admit_rate: 0.5,
+        test_policy: "unknown",
+        c7_factors: {},
+        selectivity_tier: "accessible",
+      });
+    });
+
+    await runCheck(
+      results,
+      "Anonymous cannot insert public program requirement rows",
+      async () => {
+        await expectRejected(anonymousDb, "program_requirements", {
+          unitid: testUnitid,
+          program_name: `Admira RLS Blocked Program ${runId}`,
+          system: "direct",
+          cutoff_basis: "percentage",
+          source_url: "https://example.com/admira-rls-harness",
+        });
+      },
+    );
 
     userAId = await createTestUser(service, emailA, password);
     userBId = await createTestUser(service, emailB, password);
@@ -466,10 +505,24 @@ async function main() {
     // Delete the temporary school only after the outcome rows that
     // reference it are gone, so the foreign key does not block cleanup.
     try {
+      await deleteByColumn(serviceDb, "program_requirements", "unitid", testUnitid);
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error ? error.message : "program_requirements delete failed",
+      );
+    }
+    try {
       await deleteByColumn(serviceDb, "schools", "unitid", testUnitid);
     } catch (error) {
       cleanupErrors.push(
         error instanceof Error ? error.message : "schools delete failed",
+      );
+    }
+    try {
+      await deleteByColumn(serviceDb, "schools", "unitid", blockedSchoolUnitid);
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error ? error.message : "blocked schools delete failed",
       );
     }
 

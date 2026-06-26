@@ -7,7 +7,14 @@ import {
 } from "./program-fit";
 import type { InferenceSchool } from "../model/inference";
 import { buildChancePayload } from "../model/inference";
-import type { SchoolRegion, SchoolSizeBand, SelectivityTier } from "../types";
+import type {
+  AdmissionSystem,
+  Country,
+  GradingBasis,
+  SchoolRegion,
+  SchoolSizeBand,
+  SelectivityTier,
+} from "../types";
 
 export const FIT_CANDIDATE_POOL_SIZE = 60;
 export const FIT_RESULT_LIMIT = 12;
@@ -17,6 +24,11 @@ type CostStatus = "within_ceiling" | "over_ceiling" | "unknown";
 
 export type FitSchoolCandidate = InferenceSchool & {
   state: string | null;
+  province_state: string | null;
+  country: Country;
+  admission_system: AdmissionSystem | null;
+  grading_basis: GradingBasis;
+  broad_based_admission: boolean;
   region: SchoolRegion | null;
   size_band: SchoolSizeBand | null;
   setting: "city" | "suburb" | "town" | "rural" | null;
@@ -35,6 +47,8 @@ export type FitResult = {
   school: {
     unitid: number;
     name: string;
+    country: Country;
+    province_state: string | null;
     region: SchoolRegion | null;
     size_band: SchoolSizeBand | null;
     setting: "city" | "suburb" | "town" | "rural" | null;
@@ -284,6 +298,8 @@ export function buildFitResult(
     school: {
       unitid: candidate.unitid,
       name: candidate.name,
+      country: candidate.country,
+      province_state: candidate.province_state,
       region: candidate.region,
       size_band: candidate.size_band,
       setting: candidate.setting,

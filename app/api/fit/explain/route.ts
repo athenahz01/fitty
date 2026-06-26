@@ -16,6 +16,8 @@ const explainRequestSchema = z
       .object({
         unitid: z.number().int(),
         name: z.string().trim().min(1).max(180),
+        country: z.enum(["US", "CA"]).optional(),
+        province_state: z.string().trim().max(80).nullable().optional(),
         region: z.string().trim().max(80).nullable().optional(),
         size_band: z.string().trim().max(40).nullable().optional(),
         setting: z.string().trim().max(40).nullable().optional(),

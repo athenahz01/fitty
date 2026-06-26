@@ -5,7 +5,7 @@ import { CheckCircle2, LockKeyhole, LogOut, Search, ShieldCheck } from "lucide-r
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { searchLocalSchoolFixtures } from "@/lib/school-fixtures";
-import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { searchSchools } from "@/lib/school-search";
 
 import {
   fetchOutcomeJson,
@@ -24,6 +24,8 @@ type CaptureSchoolRow = {
   unitid: number;
   name: string;
   state: string | null;
+  province_state: string | null;
+  country: "US" | "CA";
   selectivity_tier: string | null;
 };
 
@@ -103,6 +105,14 @@ const initialOutcomeForm: CaptureOutcomeForm = {
   applicationRound: "regular",
   cycleYear: currentCycleYear,
 };
+
+function schoolLocationLabel(school: CaptureSchoolRow) {
+  return (
+    school.province_state ??
+    school.state ??
+    (school.country === "CA" ? "Province unknown" : "State unknown")
+  );
+}
 
 const courseRigorOptions = [
   { value: "standard", label: "Standard" },
@@ -318,23 +328,13 @@ export function OutcomeCapturePanel() {
           return;
         }
 
-        const client = createSupabaseBrowserClient();
-        const { data, error } = await client
-          .from("schools")
-          .select("unitid,name,state,selectivity_tier")
-          .ilike("name", `%${query}%`)
-          .order("name", { ascending: true })
-          .limit(8);
+        const results = await searchSchools(query);
 
         if (requestId !== schoolSearchRequest.current) {
           return;
         }
 
-        if (error) {
-          throw error;
-        }
-
-        setSchoolResults(data ?? []);
+        setSchoolResults(results);
         setSchoolSearchStatus("ready");
         setSchoolSearchError("");
       } catch (error) {
@@ -886,7 +886,7 @@ function OutcomeStep({
                     >
                       <strong>{school.name}</strong>
                       <span className="helper">
-                        {school.state ?? "State unknown"} -{" "}
+                        {schoolLocationLabel(school)} -{" "}
                         {school.selectivity_tier ?? "tier unknown"}
                       </span>
                     </button>

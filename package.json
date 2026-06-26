@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "ingest:canada": "python pipeline/ingest/ingest_canada_seed.py",
+    "verify:phase0:migration": "node --import tsx pipeline/audit/verify_phase0_migration.ts",
     "train:real": "python pipeline/train_real.py",
     "check:real-gate": "python pipeline/check_real_gate.py",
     "verify:rls": "node --conditions react-server --import tsx pipeline/verify_rls.ts",

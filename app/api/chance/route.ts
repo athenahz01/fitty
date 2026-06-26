@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buildChancePayload, getActiveArtifact } from "@/lib/model/inference";
 import { buildClimbLevers } from "@/lib/fit/levers";
+import { canadaEnabled } from "@/lib/geo/server";
 import { chanceRequestSchema, formatValidationError } from "@/lib/model/schema";
 import { createSupabaseServerClient } from "@/lib/supabase";
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   const { data: school, error } = await supabase
     .from("schools")
     .select(
-      "unitid,name,setting,size,admit_rate,ed_admit_rate,rd_admit_rate,sat_25,sat_75,act_25,act_75,gpa_avg,test_policy,c7_factors,selectivity_tier",
+      "unitid,name,country,setting,size,admit_rate,ed_admit_rate,rd_admit_rate,sat_25,sat_75,act_25,act_75,gpa_avg,test_policy,c7_factors,selectivity_tier",
     )
     .eq("unitid", parsed.data.unitid)
     .maybeSingle();
@@ -59,6 +60,20 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: `School ${parsed.data.unitid} was not found.` },
       { status: 404 },
+    );
+  }
+
+  if (school.country === "CA") {
+    if (!canadaEnabled()) {
+      return NextResponse.json(
+        { error: `School ${parsed.data.unitid} was not found.` },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Canada chance scoring is scheduled for Phase 1." },
+      { status: 501 },
     );
   }
 

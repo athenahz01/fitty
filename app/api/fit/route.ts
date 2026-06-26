@@ -13,6 +13,7 @@ import {
 } from "@/lib/fit/matching";
 import { fitRequestSchema, formatValidationError } from "@/lib/fit/schema";
 import { fitFinderEnabled } from "@/lib/fit/server";
+import { canadaEnabled } from "@/lib/geo/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
     p_preferred_size: parsed.data.preferred_size ?? null,
     p_preferred_setting: parsed.data.preferred_setting ?? null,
     p_cost_ceiling: parsed.data.cost_ceiling ?? null,
+    p_include_canada: canadaEnabled(),
   });
 
   if (error) {
