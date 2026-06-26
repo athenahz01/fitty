@@ -61,6 +61,14 @@ type LeverContribution = {
   logit_contribution: number;
 };
 
+export type FeatureContribution = {
+  feature: FeatureName;
+  group: string;
+  label: string;
+  contribution: number;
+  value: number;
+};
+
 export type LeverDecomposition = {
   controllable: LeverContribution[];
   fixed: LeverContribution[];
@@ -383,6 +391,15 @@ function standardizeFeature(
   return (value - mean) / scale;
 }
 
+function leverLabelForFeature(feature: FeatureName, runtimeArtifact: RuntimeArtifact) {
+  const leverFeature = FEATURE_TO_LEVER[feature];
+  const metadata = leverMetadataByFeature(runtimeArtifact).get(leverFeature);
+  return {
+    group: leverFeature,
+    label: metadata?.label ?? feature.replace(/_/g, " "),
+  };
+}
+
 function sigmoid(value: number) {
   return 1 / (1 + Math.exp(-value));
 }
@@ -550,6 +567,24 @@ export function leverDecomposition(
     }));
 
   return result;
+}
+
+export function featureContributions(
+  features: FeatureVector,
+  runtimeArtifact = artifact,
+): FeatureContribution[] {
+  return featureOrder.map((feature, index) => {
+    const labels = leverLabelForFeature(feature, runtimeArtifact);
+    return {
+      feature,
+      group: labels.group,
+      label: labels.label,
+      value: features[feature],
+      contribution:
+        runtimeArtifact.coefficients[index] *
+        standardizeFeature(runtimeArtifact, feature, features[feature]),
+    };
+  });
 }
 
 export function deriveBand(prediction: Prediction) {

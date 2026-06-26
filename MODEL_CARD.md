@@ -35,6 +35,27 @@ The pipeline trains an L2-penalized logistic regression on the synthetic trainin
 
 Every downstream prediction must be presented as a range. The point probability is only a marker inside the interval, never the answer by itself.
 
+## Phase 1 Admit Intelligence
+
+Admit Intelligence v2 is feature-flagged by `ADMIRA_ADMIT_INTELLIGENCE_ENABLED`. When the flag is off, `/api/chance` remains the active public range experience.
+
+For U.S. schools, the headline score is a deterministic presentation transform of the calibrated probability already produced by the public-prior model:
+
+`score = round(clamp(calibrated_probability, 0, 1) * 100)`
+
+No new random draw, resampling step, or independent point estimate is introduced. Tier labels share one threshold table:
+
+- `Reach`: `0 <= p < 0.30`
+- `Target`: `0.30 <= p < 0.55`
+- `Likely`: `0.55 <= p < 0.80`
+- `Safety`: `0.80 <= p <= 1.00`
+
+U.S. drivers are grouped from the same engineered feature contributions used by the scorer. The driver layer must remain directionally consistent with the headline tier: high tiers require positive support, reach tiers require a negative driver, and targets require non-neutral evidence. Drivers are explanation of the same score, not a second model.
+
+For Canadian programs, Phase 1 uses `program_requirements` rows directly. Applicant averages are compared only in the row's native `cutoff_basis`; Admira refuses cross-basis comparisons rather than using placeholder GPA/percentage/R-score conversions. The deterministic Canada scorer anchors below, within, and above the loaded cutoff band, then tempers the result for missing prerequisites and broad-based or supplemental review flags. `npm run score:canada-holdout` checks cutoff behavior against the seeded Canadian holdout rows.
+
+Profile Studio axes are deterministic support views, not separate admit probabilities. The five axes are Academics, Rigor, Test, Extracurricular Impact, and Fit. The `confidence` field is a texture for UI display based on available public-data width or Canada row completeness; it is not calibrated applicant-level certainty.
+
 ## Intended Use
 
 This model is for decision support and product-contract validation. It can say, in a public-data-prior sense, where a student sits relative to a school's published bands and how much uncertainty remains. It must not be used as an oracle or as a claim that Admira can predict real individual outcomes from public data alone.

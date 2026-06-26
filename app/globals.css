@@ -1071,6 +1071,25 @@ button {
   color: var(--fit-ink);
 }
 
+.tier-pill[data-tier="reach"] {
+  background: var(--reach-wash);
+  border-color: color-mix(in srgb, var(--chance-primary) 32%, transparent);
+  color: var(--chance-ink);
+}
+
+.tier-pill[data-tier="target"] {
+  background: var(--target-wash);
+  border-color: color-mix(in srgb, #eab308 34%, transparent);
+  color: #854d0e;
+}
+
+.tier-pill[data-tier="likely"],
+.tier-pill[data-tier="safety"] {
+  background: var(--likely-wash);
+  border-color: color-mix(in srgb, var(--fit-green) 34%, transparent);
+  color: var(--fit-ink);
+}
+
 .fit-pill {
   background: var(--fit-wash);
   border-color: color-mix(in srgb, var(--fit-teal) 36%, transparent);
@@ -1082,6 +1101,193 @@ button {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.admit-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fit-wash) 62%, transparent), transparent 36%),
+    var(--card-bg);
+}
+
+.admit-sigil {
+  background: var(--fit-wash);
+  color: var(--fit-ink);
+}
+
+.admit-score-reveal {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.42fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  padding: 20px;
+}
+
+.admit-score-main {
+  display: grid;
+  align-content: center;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  min-height: 166px;
+  padding: 18px;
+}
+
+.admit-score-value {
+  color: var(--fit-ink);
+  font-size: clamp(56px, 9vw, 88px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.92;
+}
+
+.admit-score-scale {
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.admit-score-copy {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.admit-score-copy .result-verdict {
+  padding: 0;
+}
+
+.confidence-texture {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+
+.confidence-bars {
+  display: inline-grid;
+  grid-template-columns: repeat(8, 8px);
+  gap: 4px;
+}
+
+.confidence-bars i {
+  display: block;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--rule);
+}
+
+.confidence-bars i[data-active="true"] {
+  background: var(--fit-teal);
+}
+
+.admit-drivers,
+.profile-studio {
+  margin: 0 20px 20px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 16px;
+}
+
+.admit-drivers ul,
+.profile-axis-list {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admit-drivers li,
+.profile-axis-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+
+.admit-drivers strong,
+.admit-drivers .helper,
+.profile-axis-list strong,
+.profile-axis-list .helper {
+  display: block;
+}
+
+.driver-icon {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--muted);
+}
+
+.admit-drivers li[data-direction="positive"] .driver-icon {
+  background: var(--likely-wash);
+  color: var(--fit-ink);
+}
+
+.admit-drivers li[data-direction="negative"] .driver-icon {
+  background: var(--reach-wash);
+  color: var(--chance-ink);
+}
+
+.driver-impact {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.profile-studio-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-studio-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.profile-studio-radar {
+  min-width: 0;
+}
+
+.profile-studio-radar .recharts-wrapper {
+  margin: 0 auto;
+}
+
+.profile-method {
+  margin: 12px 0 0;
+}
+
+.profile-axis-list {
+  margin-top: 0;
+}
+
+.profile-axis-list li[data-status="strong"] .dimension-status {
+  background: var(--fit-wash);
+  color: var(--fit-ink);
+}
+
+.profile-axis-list li[data-status="steady"] .dimension-status {
+  background: var(--target-wash);
+  color: #854d0e;
+}
+
+.profile-axis-list li[data-status="stretch"] .dimension-status {
+  background: var(--reach-wash);
+  color: var(--chance-ink);
 }
 
 .icon-button {
@@ -3445,7 +3651,11 @@ button {
   .fit-score-layout,
   .climb-row,
   .blind-spot-list,
-  .fit-dimension-list li {
+  .fit-dimension-list li,
+  .admit-score-reveal,
+  .profile-studio-grid,
+  .admit-drivers li,
+  .profile-axis-list li {
     grid-template-columns: 1fr;
   }
 

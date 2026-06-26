@@ -52,6 +52,19 @@ export const localSchoolFixtures: LocalSchoolFixture[] = [
     act_75: 31,
     test_policy: "optional",
   },
+  {
+    unitid: 900001,
+    name: "University of Waterloo",
+    state: null,
+    province_state: "ON",
+    country: "CA",
+    selectivity_tier: "highly_selective",
+    sat_25: null,
+    sat_75: null,
+    act_25: null,
+    act_75: null,
+    test_policy: "unknown",
+  },
 ];
 
 export function searchLocalSchoolFixtures(query: string, limit = 8) {

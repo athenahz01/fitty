@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+} from "recharts";
+import {
   AlertTriangle,
   BookOpen,
   Check,
@@ -36,9 +44,11 @@ import { OutcomeSessionProvider } from "./outcome-session";
 
 type ApplicationRound = "regular" | "early";
 type BandLabel = "reach" | "target" | "likely";
+type AdmitTier = "Reach" | "Target" | "Likely" | "Safety";
 
 type Profile = {
   gpa: string;
+  canadianAverage: string;
   sat: string;
   act: string;
   notSubmittingTests: boolean;
@@ -46,6 +56,7 @@ type Profile = {
   applicationRound: ApplicationRound;
   homeState: string;
   activityNote: string;
+  completedPrerequisites: string;
 };
 
 type SchoolSearchRow = SchoolSearchResult;
@@ -143,10 +154,64 @@ type ChanceRequestBody = {
   application_round: ApplicationRound;
 };
 
+type AdmitIntelligenceRequestBody = ChanceRequestBody & {
+  intended_major?: string;
+  activity_context?: string;
+  applicant_average?: number;
+  applicant_basis?: "percentage";
+  completed_prerequisites?: string[];
+  program_name?: string;
+};
+
+type AdmitDriver = {
+  label: string;
+  direction: "positive" | "negative" | "neutral";
+  impact: number;
+  detail: string;
+};
+
+type AdmitProfileAxis = {
+  key: "academics" | "rigor" | "test" | "extracurricular" | "fit";
+  label: string;
+  value: number;
+  admitted: number;
+  status: "strong" | "steady" | "stretch";
+  note: string;
+};
+
+type AdmitIntelligenceResponse = {
+  score: number;
+  tier: AdmitTier;
+  drivers: AdmitDriver[];
+  confidence: number;
+  country: "US" | "CA";
+  profile: {
+    axes: AdmitProfileAxis[];
+    method: string;
+  };
+  probability: {
+    calibrated: number;
+    low?: number;
+    high?: number;
+    width?: number;
+    coverage?: number;
+  };
+  program?: {
+    name: string;
+    source_url: string;
+    cutoff: {
+      low: number | null;
+      high: number | null;
+      basis: string;
+    };
+  };
+};
+
 type AddedSchool = {
   school: SchoolSearchRow;
   status: "loading" | "ready" | "error";
   result?: ChanceResponse;
+  intelligence?: AdmitIntelligenceResponse;
   error?: string;
 };
 
@@ -248,9 +313,11 @@ type FitExplanationState = {
 };
 
 type FitFinderStatus = "checking" | "enabled" | "disabled";
+type AdmitIntelligenceStatus = "checking" | "enabled" | "disabled";
 
 const initialProfile: Profile = {
   gpa: "3.85",
+  canadianAverage: "92",
   sat: "1480",
   act: "",
   notSubmittingTests: false,
@@ -258,6 +325,7 @@ const initialProfile: Profile = {
   applicationRound: "regular",
   homeState: "NY",
   activityNote: "",
+  completedPrerequisites: "ENG4U, MHF4U, MCV4U",
 };
 
 const initialFitPreferences: FitPreferences = {
@@ -311,6 +379,32 @@ function formatSignedPoints(value: number) {
 
 function formatRoundLabel(round: ApplicationRound) {
   return round === "early" ? "Early" : "Regular";
+}
+
+function formatAdmitTier(tier: AdmitTier) {
+  return tier.toUpperCase();
+}
+
+function bandFromAdmitTier(tier: AdmitTier): BandLabel {
+  if (tier === "Reach") {
+    return "reach";
+  }
+  if (tier === "Target") {
+    return "target";
+  }
+  return "likely";
+}
+
+function intendedMajorForRequest(profile: Profile) {
+  const major = profile.intendedMajor.trim();
+  return major && major.toLowerCase() !== "undecided" ? major : undefined;
+}
+
+function parsePrerequisites(value: string) {
+  return value
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function schoolLocationLabel(
@@ -536,11 +630,19 @@ function testPolicyControlReason(policy: string | null, hasTestScore: boolean) {
 function validateProfile(profile: Profile) {
   const errors: string[] = [];
   const gpa = numberOrUndefined(profile.gpa);
+  const canadianAverage = numberOrUndefined(profile.canadianAverage);
   const sat = numberOrUndefined(profile.sat);
   const act = numberOrUndefined(profile.act);
 
   if (gpa !== undefined && (gpa < 0 || gpa > 5)) {
     errors.push("GPA must be between 0 and 5.");
+  }
+
+  if (
+    profile.canadianAverage.trim() &&
+    (canadianAverage === undefined || canadianAverage < 0 || canadianAverage > 100)
+  ) {
+    errors.push("Canadian average must be between 0 and 100.");
   }
 
   if (!profile.notSubmittingTests) {
@@ -557,12 +659,19 @@ function validateProfile(profile: Profile) {
 
 function profileFieldErrors(profile: Profile) {
   const gpa = numberOrUndefined(profile.gpa);
+  const canadianAverage = numberOrUndefined(profile.canadianAverage);
   const sat = numberOrUndefined(profile.sat);
   const act = numberOrUndefined(profile.act);
-  const out: { gpa?: string; sat?: string; act?: string } = {};
+  const out: { gpa?: string; canadianAverage?: string; sat?: string; act?: string } = {};
 
   if (gpa !== undefined && (gpa < 0 || gpa > 5)) {
     out.gpa = "GPA is out of range. Use 0 to 5.";
+  }
+  if (
+    profile.canadianAverage.trim() &&
+    (canadianAverage === undefined || canadianAverage < 0 || canadianAverage > 100)
+  ) {
+    out.canadianAverage = "Average is out of range. Use 0 to 100.";
   }
   if (!profile.notSubmittingTests) {
     if (sat !== undefined && (!Number.isInteger(sat) || sat < 400 || sat > 1600)) {
@@ -586,6 +695,33 @@ function buildChanceBody(profile: Profile, unitid: number): ChanceRequestBody {
     ...(act !== undefined ? { act_score: act } : {}),
     ...(gpa !== undefined ? { gpa } : {}),
     application_round: profile.applicationRound,
+  };
+}
+
+function buildAdmitIntelligenceBody(
+  profile: Profile,
+  school: SchoolSearchRow,
+): AdmitIntelligenceRequestBody {
+  const chanceBody = buildChanceBody(profile, school.unitid);
+  const intendedMajor = intendedMajorForRequest(profile);
+  const activityContext = profile.activityNote.trim();
+  const canadianAverage = numberOrUndefined(profile.canadianAverage);
+  const prerequisites = parsePrerequisites(profile.completedPrerequisites);
+
+  return {
+    ...chanceBody,
+    ...(intendedMajor ? { intended_major: intendedMajor } : {}),
+    ...(activityContext ? { activity_context: activityContext } : {}),
+    ...(school.country === "CA" && canadianAverage !== undefined
+      ? {
+          applicant_average: canadianAverage,
+          applicant_basis: "percentage" as const,
+          ...(prerequisites.length > 0
+            ? { completed_prerequisites: prerequisites }
+            : {}),
+          ...(intendedMajor ? { program_name: intendedMajor } : {}),
+        }
+      : {}),
   };
 }
 
@@ -684,6 +820,8 @@ export function AdmiraApp() {
   const [formNotice, setFormNotice] = useState("");
   const [fitFinderStatus, setFitFinderStatus] =
     useState<FitFinderStatus>("checking");
+  const [admitIntelligenceStatus, setAdmitIntelligenceStatus] =
+    useState<AdmitIntelligenceStatus>("checking");
   const searchRequest = useRef(0);
 
   const profileErrors = useMemo(() => validateProfile(profile), [profile]);
@@ -697,6 +835,23 @@ export function AdmiraApp() {
 
   useEffect(() => {
     let active = true;
+
+    async function loadAdmitIntelligenceStatus() {
+      try {
+        const response = await fetch("/api/admit-intelligence/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setAdmitIntelligenceStatus(
+          payload?.enabled === true ? "enabled" : "disabled",
+        );
+      } catch {
+        if (active) {
+          setAdmitIntelligenceStatus("disabled");
+        }
+      }
+    }
 
     async function loadFitFinderStatus() {
       try {
@@ -713,6 +868,7 @@ export function AdmiraApp() {
       }
     }
 
+    void loadAdmitIntelligenceStatus();
     void loadFitFinderStatus();
 
     return () => {
@@ -806,23 +962,43 @@ export function AdmiraApp() {
   }
 
   async function fetchChance(school: SchoolSearchRow) {
+    const useAdmitIntelligence = admitIntelligenceStatus === "enabled";
+
     try {
-      const response = await fetch("/api/chance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildChanceBody(profile, school.unitid)),
-      });
+      const response = await fetch(
+        useAdmitIntelligence ? "/api/admit-intelligence" : "/api/chance",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            useAdmitIntelligence
+              ? buildAdmitIntelligenceBody(profile, school)
+              : buildChanceBody(profile, school.unitid),
+          ),
+        },
+      );
 
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "Chance request failed.");
+        throw new Error(
+          payload?.error ??
+            (useAdmitIntelligence
+              ? "Admit Intelligence request failed."
+              : "Chance request failed."),
+        );
       }
 
       setAddedSchools((current) =>
         current.map((entry) =>
           entry.school.unitid === school.unitid
-            ? { school, status: "ready", result: payload as ChanceResponse }
+            ? useAdmitIntelligence
+              ? {
+                  school,
+                  status: "ready",
+                  intelligence: payload as AdmitIntelligenceResponse,
+                }
+              : { school, status: "ready", result: payload as ChanceResponse }
             : entry,
         ),
       );
@@ -836,7 +1012,9 @@ export function AdmiraApp() {
                 error:
                   error instanceof Error
                     ? error.message
-                    : "Chance request failed.",
+                    : useAdmitIntelligence
+                      ? "Admit Intelligence request failed."
+                      : "Chance request failed.",
               }
             : entry,
         ),
@@ -853,7 +1031,13 @@ export function AdmiraApp() {
     setFormNotice("");
     const schools = addedSchools.map((entry) => entry.school);
     setAddedSchools((current) =>
-      current.map((entry) => ({ ...entry, status: "loading", error: undefined })),
+      current.map((entry) => ({
+        ...entry,
+        status: "loading",
+        result: undefined,
+        intelligence: undefined,
+        error: undefined,
+      })),
     );
 
     for (const school of schools) {
@@ -867,9 +1051,15 @@ export function AdmiraApp() {
     );
   }
 
-  const readyResults = addedSchools
-    .map((entry) => entry.result)
-    .filter((result): result is ChanceResponse => Boolean(result));
+  const readyBalanceLabels = addedSchools
+    .map((entry) =>
+      entry.result
+        ? entry.result.band.label
+        : entry.intelligence
+          ? bandFromAdmitTier(entry.intelligence.tier)
+          : null,
+    )
+    .filter((label): label is BandLabel => Boolean(label));
 
   return (
     <main className="admira-shell">
@@ -913,9 +1103,12 @@ export function AdmiraApp() {
               errors={profileErrors}
               notice={formNotice}
               noAcademicInput={noAcademicInput}
+              admitIntelligenceEnabled={admitIntelligenceStatus === "enabled"}
               onSave={recalculateAll}
             />
-            {readyResults.length > 0 ? <BalancePanel results={readyResults} /> : null}
+            {readyBalanceLabels.length > 0 ? (
+              <BalancePanel labels={readyBalanceLabels} />
+            ) : null}
           </aside>
 
           <section className="results-column" aria-label="School chance results">
@@ -1039,6 +1232,7 @@ function ProfilePanel({
   errors,
   notice,
   noAcademicInput,
+  admitIntelligenceEnabled,
   onSave,
 }: {
   profile: Profile;
@@ -1046,6 +1240,7 @@ function ProfilePanel({
   errors: string[];
   notice: string;
   noAcademicInput: boolean;
+  admitIntelligenceEnabled: boolean;
   onSave: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -1152,6 +1347,42 @@ function ProfilePanel({
             </label>
           </div>
 
+          <div className="field-pair">
+            <label className="control">
+              <span className="field-label">Canadian average</span>
+              <input
+                className="text-control mono"
+                aria-label="Canadian average"
+                inputMode="decimal"
+                placeholder="92"
+                value={profile.canadianAverage}
+                data-invalid={fieldErrors.canadianAverage ? "true" : undefined}
+                aria-invalid={fieldErrors.canadianAverage ? true : undefined}
+                onChange={(event) =>
+                  update("canadianAverage", event.target.value)
+                }
+              />
+              {fieldErrors.canadianAverage ? (
+                <FieldError text={fieldErrors.canadianAverage} />
+              ) : (
+                <span className="helper">Percentage basis for CA cutoffs.</span>
+              )}
+            </label>
+            <label className="control">
+              <span className="field-label">Completed prerequisites</span>
+              <input
+                className="text-control"
+                aria-label="Completed prerequisites"
+                placeholder="ENG4U, MHF4U, MCV4U"
+                value={profile.completedPrerequisites}
+                onChange={(event) =>
+                  update("completedPrerequisites", event.target.value)
+                }
+              />
+              <span className="helper">Comma-separated course codes.</span>
+            </label>
+          </div>
+
           <div className="control">
             <span className="field-label">Are you submitting test scores?</span>
             <div className="segmented" role="group" aria-label="Test scores">
@@ -1249,7 +1480,9 @@ function ProfilePanel({
           <label className="control">
             <span className="field-label field-label-row">
               Activities and context
-              <span className="not-scored-tag">Not scored yet</span>
+              <span className="not-scored-tag">
+                {admitIntelligenceEnabled ? "Profile Studio" : "Not scored yet"}
+              </span>
             </span>
             <textarea
               className="activity-control"
@@ -1258,7 +1491,9 @@ function ProfilePanel({
               onChange={(event) => update("activityNote", event.target.value)}
             />
             <span className="helper">
-              Context for planning, not scoring.
+              {admitIntelligenceEnabled
+                ? "Used in Profile Studio axes for the flagged experience."
+                : "Context for planning, not scoring."}
             </span>
           </label>
         </div>
@@ -2113,6 +2348,37 @@ function formatCostStatus(status: FitResult["match_reasons"]["cost_status"]) {
     case "unknown":
       return "unknown";
   }
+}
+
+function formatCutoff(
+  cutoff: NonNullable<AdmitIntelligenceResponse["program"]>["cutoff"],
+) {
+  const low = cutoff.low ?? "n/a";
+  const high = cutoff.high !== null && cutoff.high !== undefined ? cutoff.high : low;
+  return `${low}-${high} ${cutoff.basis}`;
+}
+
+function shortAxisLabel(label: string) {
+  return label === "Extracurricular Impact" ? "Extracurricular" : label;
+}
+
+function formatAxisStatus(status: AdmitProfileAxis["status"]) {
+  switch (status) {
+    case "strong":
+      return "Strong";
+    case "steady":
+      return "Steady";
+    case "stretch":
+      return "Stretch";
+  }
+}
+
+function TierPill({ tier }: { tier: AdmitTier }) {
+  return (
+    <span className="label-pill tier-pill" data-tier={tier.toLowerCase()}>
+      {formatAdmitTier(tier)}
+    </span>
+  );
 }
 
 function BandPill({ label }: { label: BandLabel }) {
@@ -2988,8 +3254,8 @@ function SchoolSearchPanel({
                   </div>
                   <strong>No match for &ldquo;{query}&rdquo;</strong>
                   <span className="muted">
-                    Admira only covers accredited U.S. colleges with published
-                    admit data. Try a different name.
+                    Admira covers schools with loaded public admit data. Try a
+                    different name.
                   </span>
                   <button
                     type="button"
@@ -3045,17 +3311,17 @@ function SchoolSearchPanel({
   );
 }
 
-function BalancePanel({ results }: { results: ChanceResponse[] }) {
+function BalancePanel({ labels }: { labels: BandLabel[] }) {
   const counts = labelOrder.reduce<Record<BandLabel, number>>(
     (acc, label) => ({ ...acc, [label]: 0 }),
     { reach: 0, target: 0, likely: 0 },
   );
 
-  results.forEach((result) => {
-    counts[result.band.label] += 1;
+  labels.forEach((label) => {
+    counts[label] += 1;
   });
 
-  const total = results.length;
+  const total = labels.length;
   const warning =
     total === 0
       ? ""
@@ -3165,6 +3431,16 @@ function ResultState({
     );
   }
 
+  if (entry.intelligence) {
+    return (
+      <AdmitIntelligenceCard
+        result={entry.intelligence}
+        school={entry.school}
+        onRemove={onRemove}
+      />
+    );
+  }
+
   return entry.result ? (
     <ResultCard result={entry.result} profile={profile} onRemove={onRemove} />
   ) : null;
@@ -3193,6 +3469,194 @@ function LoadingCard({
         Admira is waiting for the interval. No temporary number is shown.
       </p>
     </article>
+  );
+}
+
+function AdmitIntelligenceCard({
+  result,
+  school,
+  onRemove,
+}: {
+  result: AdmitIntelligenceResponse;
+  school: SchoolSearchRow;
+  onRemove: () => void;
+}) {
+  const countryLabel = result.country === "CA" ? "Canada" : "United States";
+  const programCopy = result.program
+    ? `${result.program.name} - cutoff ${formatCutoff(result.program.cutoff)}`
+    : formatTier(school.selectivity_tier);
+
+  return (
+    <article className="result-card admit-card" data-testid="admit-card">
+      <div className="result-head admit-head">
+        <div className="result-head-main">
+          <span className="result-sigil admit-sigil" aria-hidden="true">
+            {schoolInitial(school.name)}
+          </span>
+          <div>
+            <div className="section-kicker">Admit Intelligence</div>
+            <h3 className="result-title">{school.name}</h3>
+            <p className="helper">
+              {countryLabel} &middot; {programCopy}
+            </p>
+          </div>
+        </div>
+        <div className="result-head-actions">
+          <TierPill tier={result.tier} />
+          <button
+            className="icon-button"
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${school.name}`}
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+
+      <section
+        className="admit-score-reveal"
+        aria-label={`${school.name} Admit Intelligence score ${result.score} out of 100, ${result.tier}`}
+      >
+        <div className="admit-score-main">
+          <span className="micro-label">Headline score</span>
+          <strong className="admit-score-value mono">{result.score}</strong>
+          <span className="admit-score-scale">/100</span>
+        </div>
+        <div className="admit-score-copy">
+          <p className="result-verdict">
+            {result.tier} at {result.score}/100.
+          </p>
+          <div className="confidence-texture">
+            <span className="micro-label">Model confidence</span>
+            <span className="confidence-bars" aria-hidden="true">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <i
+                  key={index}
+                  data-active={
+                    index < Math.round(result.confidence * 8)
+                      ? "true"
+                      : undefined
+                  }
+                />
+              ))}
+            </span>
+            <strong className="mono">{Math.round(result.confidence * 100)}%</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="admit-drivers" aria-labelledby={`drivers-${school.unitid}`}>
+        <div className="section-kicker" id={`drivers-${school.unitid}`}>
+          Score drivers
+        </div>
+        <ul>
+          {result.drivers.map((driver) => (
+            <li key={`${driver.label}-${driver.direction}`} data-direction={driver.direction}>
+              <span className="driver-icon" aria-hidden="true">
+                {driver.direction === "positive" ? <Check size={14} /> : null}
+                {driver.direction === "negative" ? <AlertTriangle size={14} /> : null}
+                {driver.direction === "neutral" ? <CircleHelp size={14} /> : null}
+              </span>
+              <span>
+                <strong>{driver.label}</strong>
+                <span className="helper">{driver.detail}</span>
+              </span>
+              <span className="mono driver-impact">
+                {driver.direction === "negative" ? "-" : driver.direction === "positive" ? "+" : ""}
+                {driver.impact}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <ProfileStudioPanel profile={result.profile} />
+    </article>
+  );
+}
+
+function ProfileStudioPanel({
+  profile,
+}: {
+  profile: AdmitIntelligenceResponse["profile"];
+}) {
+  return (
+    <section className="profile-studio" data-testid="profile-studio">
+      <div className="profile-studio-head">
+        <div>
+          <div className="section-kicker">Profile Studio</div>
+          <h4 className="section-title text-[22px]">Five-axis profile read</h4>
+        </div>
+        <span className="label-pill">Recharts radar</span>
+      </div>
+      <div className="profile-studio-grid">
+        <ProfileStudioRadar axes={profile.axes} />
+        <ProfileStudioRows axes={profile.axes} />
+      </div>
+      <p className="helper profile-method">{profile.method}</p>
+    </section>
+  );
+}
+
+function ProfileStudioRadar({ axes }: { axes: AdmitProfileAxis[] }) {
+  const data = axes.map((axis) => ({
+    axis: shortAxisLabel(axis.label),
+    value: axis.value,
+    admitted: axis.admitted,
+  }));
+
+  return (
+    <div
+      className="profile-studio-radar"
+      role="img"
+      aria-label={axes
+        .map((axis) => `${axis.label} ${axis.value} out of 100`)
+        .join(", ")}
+    >
+      <ResponsiveContainer width="100%" height={260}>
+        <RadarChart data={data} outerRadius="72%">
+          <PolarGrid />
+          <PolarAngleAxis dataKey="axis" tick={{ fontSize: 12 }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+          <Radar
+            name="Admitted reference"
+            dataKey="admitted"
+            stroke="var(--school-indigo)"
+            fill="transparent"
+            strokeDasharray="5 5"
+          />
+          <Radar
+            name="Profile"
+            dataKey="value"
+            stroke="var(--fit-teal)"
+            fill="var(--fit-green)"
+            fillOpacity={0.28}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+      <div className="radar-legend">
+        <span><i className="legend-dot student" />Profile</span>
+        <span><i className="legend-dot typical" />Reference</span>
+      </div>
+    </div>
+  );
+}
+
+function ProfileStudioRows({ axes }: { axes: AdmitProfileAxis[] }) {
+  return (
+    <ul className="profile-axis-list">
+      {axes.map((axis) => (
+        <li key={axis.key} data-status={axis.status}>
+          <span className="dimension-status">{formatAxisStatus(axis.status)}</span>
+          <span>
+            <strong>{axis.label}</strong>
+            <span className="helper">{axis.note}</span>
+          </span>
+          <span className="mono">{axis.value}/100</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

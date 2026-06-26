@@ -332,6 +332,171 @@ const fitFinderResponse = {
   ],
 };
 
+const mitAdmitIntelligenceResponse = {
+  score: 3,
+  tier: "Reach",
+  drivers: [
+    {
+      label: "School selectivity",
+      direction: "negative",
+      impact: 2.12,
+      detail: "School selectivity pulls against the calibrated read.",
+    },
+    {
+      label: "Test score",
+      direction: "positive",
+      impact: 0.18,
+      detail: "Test score supports the calibrated read.",
+    },
+    {
+      label: "Application round",
+      direction: "neutral",
+      impact: 0,
+      detail: "Application round is neutral in the calibrated read.",
+    },
+  ],
+  confidence: 0.51,
+  country: "US",
+  profile: {
+    method:
+      "US axes compare submitted academics to CDS C9-C12-style score bands and C7 importance ratings.",
+    axes: [
+      {
+        key: "academics",
+        label: "Academics",
+        value: 78,
+        admitted: 78,
+        status: "steady",
+        note: "GPA and submitted tests against loaded admitted-student bands.",
+      },
+      {
+        key: "rigor",
+        label: "Rigor",
+        value: 82,
+        admitted: 78,
+        status: "steady",
+        note: "Academic read blended with the school's CDS rigor rating.",
+      },
+      {
+        key: "test",
+        label: "Test",
+        value: 85,
+        admitted: 76,
+        status: "strong",
+        note: "Submitted SAT/ACT against the public middle 50 where available.",
+      },
+      {
+        key: "extracurricular",
+        label: "Extracurricular Impact",
+        value: 71,
+        admitted: 74,
+        status: "steady",
+        note: "Activity context blended with CDS extracurricular importance.",
+      },
+      {
+        key: "fit",
+        label: "Fit",
+        value: 72,
+        admitted: 72,
+        status: "steady",
+        note: "Intended major presence against the school context available today.",
+      },
+    ],
+  },
+  probability: {
+    calibrated: 0.032967,
+    low: 0,
+    high: 0.492967,
+    width: 0.492967,
+    coverage: 0.8,
+  },
+};
+
+const waterlooAdmitIntelligenceResponse = {
+  score: 48,
+  tier: "Target",
+  drivers: [
+    {
+      label: "Admission average",
+      direction: "positive",
+      impact: 2,
+      detail: "92 percentage vs 90-93 published band.",
+    },
+    {
+      label: "Prerequisites",
+      direction: "positive",
+      impact: 0,
+      detail: "100% of loaded prerequisites matched.",
+    },
+    {
+      label: "Broad-based review",
+      direction: "negative",
+      impact: 0.03,
+      detail: "Supplemental or broad-based review tempers a cutoff-only read.",
+    },
+  ],
+  confidence: 0.79,
+  country: "CA",
+  program: {
+    name: "Computer Science",
+    source_url: "https://www.ouinfo.ca/programs/example/cs",
+    cutoff: {
+      low: 90,
+      high: 93,
+      basis: "percentage",
+    },
+  },
+  profile: {
+    method:
+      "Canada axes compare applicant average to the program cutoff band in its native basis, with prerequisites and broad-based flags from program_requirements.",
+    axes: [
+      {
+        key: "academics",
+        label: "Academics",
+        value: 75,
+        admitted: 76,
+        status: "steady",
+        note: "Applicant average against the published program cutoff band.",
+      },
+      {
+        key: "rigor",
+        label: "Rigor",
+        value: 84,
+        admitted: 76,
+        status: "strong",
+        note: "Loaded prerequisite match for the selected Canadian program.",
+      },
+      {
+        key: "test",
+        label: "Test",
+        value: 72,
+        admitted: 72,
+        status: "steady",
+        note: "Canadian seed rows do not require SAT/ACT for this cutoff read.",
+      },
+      {
+        key: "extracurricular",
+        label: "Extracurricular Impact",
+        value: 70,
+        admitted: 72,
+        status: "steady",
+        note: "Activity context matters most when broad-based review is flagged.",
+      },
+      {
+        key: "fit",
+        label: "Fit",
+        value: 68,
+        admitted: 74,
+        status: "stretch",
+        note: "Program-level fit from the selected requirement row and review system.",
+      },
+    ],
+  },
+  probability: {
+    calibrated: 0.48,
+  },
+};
+
 const authUser = {
   id: "00000000-0000-4000-8000-000000000001",
   aud: "authenticated",
@@ -416,6 +581,15 @@ async function mockOutcomeStatus(page: Page, enabled: boolean) {
 
 async function mockFitStatus(page: Page, enabled: boolean) {
   await page.route("**/api/fit/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
+async function mockAdmitIntelligenceStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/admit-intelligence/status", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ enabled }),
@@ -1111,6 +1285,121 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
   await expect(fitCard).toContainText(
     "Published cost only",
   );
+});
+
+test("renders Admit Intelligence for a US school when the flag is enabled", async ({
+  page,
+}) => {
+  let admitRequests = 0;
+
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, true);
+  await page.route("**/api/admit-intelligence", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      unitid: 166683,
+      sat_score: 1540,
+      act_score: 35,
+      gpa: 3.95,
+      application_round: "regular",
+      intended_major: "Computer science",
+      activity_context: "Robotics captain and research internship.",
+    });
+    expect(body).not.toHaveProperty("activityNote");
+    expect(body).not.toHaveProperty("homeState");
+    expect(body).not.toHaveProperty("intendedMajor");
+    expectNoForbiddenKeys(body);
+    admitRequests += 1;
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(mitAdmitIntelligenceResponse),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByText("Profile Studio").first()).toBeVisible();
+  await page.getByLabel("GPA").fill("3.95");
+  await page.getByLabel("SAT").fill("1540");
+  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await page.getByLabel("Intended major").fill("Computer science");
+  await page
+    .getByPlaceholder(/Robotics captain/)
+    .fill("Robotics captain and research internship.");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByLabel("Search by school name").fill("Massachusetts");
+  await page
+    .getByRole("button", { name: /Massachusetts Institute of Technology/ })
+    .click();
+
+  const card = page.getByTestId("admit-card");
+  await expect(card).toContainText("Admit Intelligence");
+  await expect(card).toContainText("Reach at 3/100");
+  await expect(card).toContainText("Model confidence");
+  await expect(card).toContainText("School selectivity");
+  await expect(card.getByTestId("profile-studio")).toContainText(
+    "Five-axis profile read",
+  );
+  await expect(card.locator(".profile-studio-radar svg")).toBeVisible();
+  await expect(page.getByTestId("result-card")).toHaveCount(0);
+  expect(admitRequests).toBe(1);
+});
+
+test("renders Admit Intelligence for a Canadian program when the flag is enabled", async ({
+  page,
+}) => {
+  let admitRequests = 0;
+
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, true);
+  await page.route("**/api/admit-intelligence", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      unitid: 900001,
+      applicant_average: 92,
+      applicant_basis: "percentage",
+      completed_prerequisites: ["ENG4U", "MHF4U", "MCV4U"],
+      program_name: "Computer Science",
+      intended_major: "Computer Science",
+      activity_context: "AIF, robotics, and math contests.",
+    });
+    expectNoForbiddenKeys(body);
+    admitRequests += 1;
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(waterlooAdmitIntelligenceResponse),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByText("Profile Studio").first()).toBeVisible();
+  await page.getByLabel("Intended major").fill("Computer Science");
+  await page.getByLabel("Canadian average").fill("92");
+  await page
+    .getByLabel("Completed prerequisites")
+    .fill("ENG4U, MHF4U, MCV4U");
+  await page
+    .getByPlaceholder(/Robotics captain/)
+    .fill("AIF, robotics, and math contests.");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByLabel("Search by school name").fill("Waterloo");
+  await page
+    .getByRole("button", { name: /University of Waterloo/ })
+    .click();
+
+  const card = page.getByTestId("admit-card");
+  await expect(card).toContainText("University of Waterloo");
+  await expect(card).toContainText("Target at 48/100");
+  await expect(card).toContainText("Computer Science - cutoff 90-93 percentage");
+  await expect(card).toContainText("Admission average");
+  await expect(card).toContainText("Prerequisites");
+  await expect(card.locator(".profile-studio-radar svg")).toBeVisible();
+  expect(admitRequests).toBe(1);
 });
 
 test("renders an honest elite-school result and methodology disclosure", async ({
