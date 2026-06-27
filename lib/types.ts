@@ -95,6 +95,63 @@ export type ProgramRequirement = {
   ingested_at: string;
 };
 
+export type ApplicationDeadline = {
+  id: string;
+  unitid: number;
+  program_requirement_id: string | null;
+  admission_system: AdmissionSystem | null;
+  deadline_kind: "regular" | "early" | "priority" | "document" | "system";
+  label: string;
+  deadline_date: string;
+  source_url: string;
+  source_name: string | null;
+  created_at: string;
+};
+
+export type CommandCenterTaskRow = {
+  id: string;
+  subject_id: string;
+  unitid: number;
+  program_requirement_id: string | null;
+  requirement_key: string;
+  title: string;
+  detail: string | null;
+  category: "academic" | "testing" | "form" | "review" | "deadline" | "document";
+  status: "todo" | "in_progress" | "done";
+  due_date: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RequirementStatusRow = {
+  id: string;
+  subject_id: string;
+  unitid: number;
+  program_requirement_id: string | null;
+  requirement_key: string;
+  status: "todo" | "in_progress" | "done";
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentRow = {
+  id: string;
+  subject_id: string;
+  unitid: number | null;
+  task_id: string | null;
+  requirement_status_id: string | null;
+  requirement_key: string | null;
+  storage_bucket: string;
+  storage_path: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  status: "uploaded" | "deleted";
+  created_at: string;
+};
+
 export type ConsentRecord = {
   id: string;
   subject_id: string;
@@ -221,6 +278,112 @@ export type Database = {
             columns: ["unitid"];
             referencedRelation: "schools";
             referencedColumns: ["unitid"];
+          },
+        ];
+      };
+      application_deadlines: {
+        Row: ApplicationDeadline;
+        Insert: Omit<ApplicationDeadline, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ApplicationDeadline, "id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "application_deadlines_unitid_fkey";
+            columns: ["unitid"];
+            referencedRelation: "schools";
+            referencedColumns: ["unitid"];
+          },
+          {
+            foreignKeyName: "application_deadlines_program_requirement_id_fkey";
+            columns: ["program_requirement_id"];
+            referencedRelation: "program_requirements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tasks: {
+        Row: CommandCenterTaskRow;
+        Insert: Omit<CommandCenterTaskRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<CommandCenterTaskRow, "id" | "subject_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "tasks_unitid_fkey";
+            columns: ["unitid"];
+            referencedRelation: "schools";
+            referencedColumns: ["unitid"];
+          },
+          {
+            foreignKeyName: "tasks_program_requirement_id_fkey";
+            columns: ["program_requirement_id"];
+            referencedRelation: "program_requirements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      requirement_status: {
+        Row: RequirementStatusRow;
+        Insert: Omit<RequirementStatusRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<RequirementStatusRow, "id" | "subject_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "requirement_status_unitid_fkey";
+            columns: ["unitid"];
+            referencedRelation: "schools";
+            referencedColumns: ["unitid"];
+          },
+          {
+            foreignKeyName: "requirement_status_program_requirement_id_fkey";
+            columns: ["program_requirement_id"];
+            referencedRelation: "program_requirements";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      documents: {
+        Row: DocumentRow;
+        Insert: Omit<
+          DocumentRow,
+          | "id"
+          | "created_at"
+          | "status"
+          | "task_id"
+          | "requirement_status_id"
+        > & {
+          id?: string;
+          created_at?: string;
+          status?: DocumentRow["status"];
+          task_id?: string | null;
+          requirement_status_id?: string | null;
+        };
+        Update: Partial<Omit<DocumentRow, "id" | "subject_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "documents_unitid_fkey";
+            columns: ["unitid"];
+            referencedRelation: "schools";
+            referencedColumns: ["unitid"];
+          },
+          {
+            foreignKeyName: "documents_task_id_fkey";
+            columns: ["task_id"];
+            referencedRelation: "tasks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_requirement_status_id_fkey";
+            columns: ["requirement_status_id"];
+            referencedRelation: "requirement_status";
+            referencedColumns: ["id"];
           },
         ];
       };

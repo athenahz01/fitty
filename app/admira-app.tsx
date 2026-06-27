@@ -16,6 +16,7 @@ import {
   ChevronDown,
   CircleHelp,
   Compass,
+  ClipboardList,
   FileText,
   GraduationCap,
   Loader2,
@@ -29,7 +30,9 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sun,
+  Target,
   Trash2,
+  Upload,
 } from "lucide-react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -357,9 +360,113 @@ type StudentsLikeYouResponse = {
   };
 };
 
+type ClimbScoreSnapshot = {
+  score: number;
+  tier: AdmitTier;
+  probability: number;
+};
+
+type ClimbRoadmapMove = {
+  id: string;
+  school: {
+    unitid: number;
+    name: string;
+  };
+  lever: {
+    feature: string;
+    label: string;
+    kind: "controllable";
+  };
+  before: ClimbScoreSnapshot;
+  after: ClimbScoreSnapshot;
+  delta_score: number;
+  crosses_tier: boolean;
+  tier_claim: string | null;
+  counterfactual: Partial<{
+    sat_score: number;
+    act_score: number;
+    application_round: ApplicationRound;
+  }>;
+  direction: string;
+  note: string;
+};
+
+type ClimbRoadmapResponse = {
+  snapshot_key: string;
+  method: string;
+  schools: Array<{
+    school: {
+      unitid: number;
+      name: string;
+    };
+    current: ClimbScoreSnapshot;
+    moves: ClimbRoadmapMove[];
+  }>;
+  ranked_moves: ClimbRoadmapMove[];
+  context: Array<{
+    feature: string;
+    label: string;
+    kind: "fixed" | "unseen" | "not_model_visible";
+    note: string;
+  }>;
+};
+
+type CommandCenterTask = {
+  id: string;
+  unitid: number;
+  program_requirement_id: string | null;
+  requirement_key: string;
+  title: string;
+  detail: string;
+  category: "academic" | "testing" | "form" | "review" | "deadline" | "document";
+  status: "todo" | "in_progress" | "done";
+  due_date: string | null;
+  source_url: string;
+};
+
+type CommandCenterResponse = {
+  progress: {
+    total: number;
+    done: number;
+    percent: number;
+  };
+  schools: Array<{
+    school: {
+      unitid: number;
+      name: string;
+      country: string | null;
+      admission_system: string | null;
+    };
+    tasks: CommandCenterTask[];
+    deadline:
+      | {
+          status: "loaded";
+          label: string;
+          date: string;
+          source_url: string;
+        }
+      | {
+          status: "not_loaded";
+          label: "Deadline not loaded";
+        };
+  }>;
+  documents: Array<{
+    id: string;
+    unitid: number | null;
+    requirement_key: string | null;
+    file_name: string;
+    content_type: string;
+    size_bytes: number;
+    status: "uploaded" | "deleted";
+    created_at: string;
+  }>;
+};
+
 type FitFinderStatus = "checking" | "enabled" | "disabled";
 type AdmitIntelligenceStatus = "checking" | "enabled" | "disabled";
 type StudentsLikeYouStatus = "checking" | "enabled" | "disabled";
+type ClimbStatus = "checking" | "enabled" | "disabled";
+type CommandCenterStatus = "checking" | "enabled" | "disabled";
 
 const initialProfile: Profile = {
   gpa: "3.85",
@@ -860,6 +967,34 @@ function buildStudentsLikeYouBody(profile: Profile, unitid?: number) {
   };
 }
 
+function buildClimbBody(profile: Profile, schools: AddedSchool[]) {
+  const chanceBody = buildChanceBody(profile, 0);
+
+  return {
+    profile: {
+      ...(chanceBody.gpa !== undefined ? { gpa: chanceBody.gpa } : {}),
+      ...(chanceBody.sat_score !== undefined
+        ? { sat_score: chanceBody.sat_score }
+        : {}),
+      ...(chanceBody.act_score !== undefined
+        ? { act_score: chanceBody.act_score }
+        : {}),
+      application_round: profile.applicationRound,
+    },
+    schools: schools.map((entry) => ({
+      unitid: entry.school.unitid,
+    })),
+  };
+}
+
+function buildCommandCenterBody(schools: AddedSchool[]) {
+  return {
+    schools: schools.map((entry) => ({
+      unitid: entry.school.unitid,
+    })),
+  };
+}
+
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value * 100));
 }
@@ -909,6 +1044,9 @@ export function AdmiraApp() {
     useState<AdmitIntelligenceStatus>("checking");
   const [studentsLikeYouStatus, setStudentsLikeYouStatus] =
     useState<StudentsLikeYouStatus>("checking");
+  const [climbStatus, setClimbStatus] = useState<ClimbStatus>("checking");
+  const [commandCenterStatus, setCommandCenterStatus] =
+    useState<CommandCenterStatus>("checking");
   const [listBuilderStatus, setListBuilderStatus] = useState<
     "checking" | "enabled" | "disabled"
   >("checking");
@@ -975,6 +1113,38 @@ export function AdmiraApp() {
       }
     }
 
+    async function loadClimbStatus() {
+      try {
+        const response = await fetch("/api/climb/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setClimbStatus(payload?.enabled === true ? "enabled" : "disabled");
+      } catch {
+        if (active) {
+          setClimbStatus("disabled");
+        }
+      }
+    }
+
+    async function loadCommandCenterStatus() {
+      try {
+        const response = await fetch("/api/command-center/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setCommandCenterStatus(
+          payload?.enabled === true ? "enabled" : "disabled",
+        );
+      } catch {
+        if (active) {
+          setCommandCenterStatus("disabled");
+        }
+      }
+    }
+
     async function loadListBuilderStatus() {
       try {
         const response = await fetch("/api/list/status");
@@ -995,6 +1165,8 @@ export function AdmiraApp() {
     void loadAdmitIntelligenceStatus();
     void loadFitFinderStatus();
     void loadStudentsLikeYouStatus();
+    void loadClimbStatus();
+    void loadCommandCenterStatus();
     void loadListBuilderStatus();
 
     return () => {
@@ -1253,6 +1425,12 @@ export function AdmiraApp() {
             ) : null}
             {studentsLikeYouStatus === "enabled" ? (
               <StudentsLikeYouPanel profile={profile} />
+            ) : null}
+            {climbStatus === "enabled" ? (
+              <ClimbRoadmapPanel profile={profile} schools={addedSchools} />
+            ) : null}
+            {commandCenterStatus === "enabled" ? (
+              <CommandCenterPanel schools={addedSchools} />
             ) : null}
             <SchoolSearchPanel
               query={schoolQuery}
@@ -2060,6 +2238,332 @@ function StudentsLikeYouPanel({ profile }: { profile: Profile }) {
           </p>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function ClimbRoadmapPanel({
+  profile,
+  schools,
+}: {
+  profile: Profile;
+  schools: AddedSchool[];
+}) {
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [response, setResponse] = useState<ClimbRoadmapResponse | null>(null);
+  const [error, setError] = useState("");
+  const readySchools = schools.filter((entry) => entry.status === "ready");
+  const topMove = response?.ranked_moves[0];
+
+  async function runRoadmap() {
+    if (readySchools.length === 0) {
+      setStatus("idle");
+      return;
+    }
+
+    setStatus("loading");
+    setError("");
+
+    try {
+      const httpResponse = await fetch("/api/climb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildClimbBody(profile, readySchools)),
+      });
+      const payload = await httpResponse.json();
+
+      if (!httpResponse.ok) {
+        throw new Error(payload?.error ?? "Climb Roadmap request failed.");
+      }
+
+      setResponse(payload as ClimbRoadmapResponse);
+      setStatus("ready");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Climb Roadmap request failed.");
+      setStatus("error");
+    }
+  }
+
+  return (
+    <section className="climb-panel" data-testid="climb-panel">
+      <div className="phase5-head">
+        <div>
+          <div className="section-kicker">Climb Roadmap</div>
+          <h3 className="section-title">Make the next score move.</h3>
+        </div>
+        <button
+          type="button"
+          className="add-button"
+          onClick={runRoadmap}
+          disabled={status === "loading" || readySchools.length === 0}
+          data-testid="climb-run"
+        >
+          {status === "loading" ? (
+            <Loader2 className="spin" size={16} />
+          ) : (
+            <Target size={16} />
+          )}
+          Build roadmap
+        </button>
+      </div>
+
+      {readySchools.length === 0 ? (
+        <div className="phase5-empty">
+          <ClipboardList size={18} aria-hidden="true" />
+          <span>Add at least one scored school to generate moves.</span>
+        </div>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="error-copy" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {topMove ? (
+        <div className="climb-results" data-testid="climb-results">
+          <div className="climb-hero">
+            <span className="micro-label">Highest computed move</span>
+            <strong>{topMove.lever.label}</strong>
+            <span>{topMove.school.name}</span>
+            <b className="impact-badge mono">
+              {topMove.delta_score >= 0 ? "+" : ""}
+              {topMove.delta_score}
+            </b>
+          </div>
+          <ul className="climb-move-list">
+            {response.ranked_moves.slice(0, 5).map((move) => (
+              <li key={move.id} className="climb-move">
+                <div>
+                  <span className="micro-label">{move.school.name}</span>
+                  <strong>{move.lever.label}</strong>
+                  <p>{move.direction}</p>
+                </div>
+                <div className="climb-scorebox">
+                  <span className="mono">
+                    {move.before.score} &rarr; {move.after.score}
+                  </span>
+                  <em>{move.tier_claim ?? move.after.tier}</em>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="climb-context">
+            {response.context.slice(0, 4).map((item) => (
+              <span key={item.feature}>{item.label}: context only</span>
+            ))}
+          </div>
+        </div>
+      ) : status === "ready" ? (
+        <div className="phase5-empty" data-testid="climb-empty">
+          <CircleHelp size={18} aria-hidden="true" />
+          <span>No model-visible score move is available for this list.</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function CommandCenterPanel({ schools }: { schools: AddedSchool[] }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [response, setResponse] = useState<CommandCenterResponse | null>(null);
+  const [error, setError] = useState("");
+  const [uploadNotice, setUploadNotice] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const readySchools = schools.filter((entry) => entry.status === "ready");
+  const allTasks = response?.schools.flatMap((school) => school.tasks) ?? [];
+  const byStatus = {
+    todo: allTasks.filter((task) => task.status === "todo"),
+    in_progress: allTasks.filter((task) => task.status === "in_progress"),
+    done: allTasks.filter((task) => task.status === "done"),
+  };
+
+  async function loadCommandCenter() {
+    if (readySchools.length === 0) {
+      setStatus("idle");
+      return;
+    }
+
+    setStatus("loading");
+    setError("");
+
+    try {
+      const httpResponse = await fetch("/api/command-center", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCommandCenterBody(readySchools)),
+      });
+      const payload = await httpResponse.json();
+
+      if (!httpResponse.ok) {
+        throw new Error(payload?.error ?? "Command Center request failed.");
+      }
+
+      setResponse(payload as CommandCenterResponse);
+      setStatus("ready");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Command Center request failed.");
+      setStatus("error");
+    }
+  }
+
+  async function uploadDocument() {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      setUploadNotice("Choose a document first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (readySchools[0]) {
+      formData.append("unitid", String(readySchools[0].school.unitid));
+    }
+
+    try {
+      const httpResponse = await fetch("/api/command-center/documents", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await httpResponse.json();
+      if (!httpResponse.ok) {
+        throw new Error(payload?.error ?? "Document upload failed.");
+      }
+      setUploadNotice("Document added to vault.");
+      await loadCommandCenter();
+    } catch (caught) {
+      setUploadNotice(
+        caught instanceof Error ? caught.message : "Document upload failed.",
+      );
+    }
+  }
+
+  return (
+    <section className="command-panel" data-testid="command-center-panel">
+      <div className="phase5-head">
+        <div>
+          <div className="section-kicker">Application Command Center</div>
+          <h3 className="section-title">Run every requirement.</h3>
+        </div>
+        <button
+          type="button"
+          className="add-button"
+          onClick={loadCommandCenter}
+          disabled={status === "loading" || readySchools.length === 0}
+          data-testid="command-center-run"
+        >
+          {status === "loading" ? (
+            <Loader2 className="spin" size={16} />
+          ) : (
+            <ClipboardList size={16} />
+          )}
+          Build center
+        </button>
+      </div>
+
+      {readySchools.length === 0 ? (
+        <div className="phase5-empty">
+          <FileText size={18} aria-hidden="true" />
+          <span>Add schools first; requirements are generated from the list.</span>
+        </div>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="error-copy" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {response ? (
+        <div className="command-results" data-testid="command-center-results">
+          <div className="command-progress">
+            <span className="micro-label">Progress</span>
+            <strong>
+              {response.progress.done}/{response.progress.total} complete
+            </strong>
+            <div className="command-meter" aria-hidden="true">
+              <span style={{ width: `${response.progress.percent}%` }} />
+            </div>
+          </div>
+
+          <div className="deadline-strip">
+            {response.schools.map((schoolPlan) => (
+              <div key={schoolPlan.school.unitid}>
+                <span>{schoolPlan.school.name}</span>
+                <strong>
+                  {schoolPlan.deadline.status === "loaded"
+                    ? schoolPlan.deadline.date
+                    : schoolPlan.deadline.label}
+                </strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="kanban-grid">
+            <TaskColumn title="To do" tasks={byStatus.todo} />
+            <TaskColumn title="In progress" tasks={byStatus.in_progress} />
+            <TaskColumn title="Done" tasks={byStatus.done} />
+          </div>
+
+          <div className="vault-panel">
+            <div>
+              <span className="micro-label">Document vault</span>
+              <strong>{response.documents.length} uploaded</strong>
+            </div>
+            <div className="vault-upload">
+              <input
+                ref={fileInputRef}
+                type="file"
+                aria-label="Upload application document"
+                accept=".pdf,.png,.jpg,.jpeg,.docx"
+              />
+              <button type="button" className="icon-button" onClick={uploadDocument}>
+                <Upload size={15} />
+              </button>
+            </div>
+            {uploadNotice ? <p className="helper">{uploadNotice}</p> : null}
+            {response.documents.length > 0 ? (
+              <ul>
+                {response.documents.map((document) => (
+                  <li key={document.id}>{document.file_name}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function TaskColumn({
+  title,
+  tasks,
+}: {
+  title: string;
+  tasks: CommandCenterTask[];
+}) {
+  return (
+    <section className="task-column">
+      <h4>{title}</h4>
+      {tasks.length === 0 ? <p className="helper">No tasks here.</p> : null}
+      {tasks.map((task) => (
+        <article key={task.id} className="task-card">
+          <span className="micro-label">{task.category}</span>
+          <strong>{task.title}</strong>
+          <p>{task.detail}</p>
+          <div>
+            <span>{task.due_date ?? "Deadline not loaded"}</span>
+            <a href={task.source_url} target="_blank" rel="noreferrer">
+              Source
+            </a>
+          </div>
+        </article>
+      ))}
     </section>
   );
 }

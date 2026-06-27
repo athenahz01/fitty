@@ -165,6 +165,41 @@ is present. The current phase excludes the user's own same-cycle rows from
 display cohorts and leaves scoring feedback off for a later, separately audited
 phase.
 
+## Phase 5 Climb Roadmap + Command Center
+
+Climb Roadmap is feature-flagged by `ADMIRA_CLIMB_ENABLED` (default false). Each
+projected move is computed by rerunning the same Phase 1 Admit Intelligence US
+scorer on a counterfactual profile, then reporting `score(after) -
+score(before)`. The current emitted counterfactuals are model-visible and
+controllable only: a modest higher submitted test score and regular-to-early
+application round. The before score/tier and after score/tier both come from
+`buildUsAdmitIntelligence`; tier-crossing claims use the shared
+`ADMIT_TIER_THRESHOLDS` table through the scorer. Fixed factors and model-unseen
+factors such as GPA-to-date, essays, recommendations, demonstrated interest, and
+remaining course rigor are shown as context only and carry no fabricated delta.
+
+Roadmap snapshots are deterministic. The snapshot key is a stable hash of the
+profile, ordered school ids, and model version. No timestamp or random value is
+used in the score, ordering, or displayed impact numbers.
+
+Application Command Center is feature-flagged by
+`ADMIRA_COMMAND_CENTER_ENABLED` (default false). Requirement tasks are assembled
+from the selected school list plus `program_requirements`. Each loaded
+prerequisite, academic cutoff band, required-testing policy, supplemental
+application flag, and broad-based review flag maps to exactly one task. Missing
+requirement data yields no invented checklist item.
+
+Deadlines are loaded only from `application_deadlines` rows that carry
+`source_url`. If no sourced row exists for a school/program/system, the UI shows
+`Deadline not loaded` and no due date is invented. The command center does not
+display cost, net-price, ROI, merit, or scholarship fields.
+
+Owner data lives in `tasks`, `requirement_status`, and `documents`, with RLS
+policies requiring `subject_id = auth.uid()` for owner reads and writes. The
+document vault uses the private `admira-document-vault` Supabase Storage bucket;
+storage policies require the first path segment to match `auth.uid()`. API
+writes use service-role routes after validating the signed-in bearer token.
+
 ## Intended Use
 
 This model is for decision support and product-contract validation. It can say, in a public-data-prior sense, where a student sits relative to a school's published bands and how much uncertainty remains. It must not be used as an oracle or as a claim that Admira can predict real individual outcomes from public data alone.

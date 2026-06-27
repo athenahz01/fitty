@@ -235,6 +235,9 @@ async function main() {
   let consentId = "";
   let profileId = "";
   let outcomeId = "";
+  let commandTaskId = "";
+  let requirementStatusId = "";
+  let documentId = "";
   let fatalError: Error | null = null;
   let cleanupFailed = false;
 
@@ -297,6 +300,60 @@ async function main() {
       },
     );
 
+    await runCheck(results, "Anonymous cannot insert command-center tasks", async () => {
+      await expectRejected(anonymousDb, "tasks", {
+        subject_id: randomUUID(),
+        unitid: testUnitid,
+        requirement_key: `anon-task-${runId}`,
+        title: "Anonymous blocked task",
+        category: "form",
+        status: "todo",
+        source_url: "https://example.com/admira-rls-harness",
+      });
+    });
+
+    await runCheck(
+      results,
+      "Anonymous cannot insert command-center requirement status",
+      async () => {
+        await expectRejected(anonymousDb, "requirement_status", {
+          subject_id: randomUUID(),
+          unitid: testUnitid,
+          requirement_key: `anon-status-${runId}`,
+          status: "todo",
+          source_url: "https://example.com/admira-rls-harness",
+        });
+      },
+    );
+
+    await runCheck(results, "Anonymous cannot insert document metadata", async () => {
+      await expectRejected(anonymousDb, "documents", {
+        subject_id: randomUUID(),
+        unitid: testUnitid,
+        requirement_key: `anon-document-${runId}`,
+        storage_bucket: "admira-document-vault",
+        storage_path: `${randomUUID()}/blocked.pdf`,
+        file_name: "blocked.pdf",
+        content_type: "application/pdf",
+        size_bytes: 128,
+      });
+    });
+
+    await runCheck(results, "Anonymous cannot list document vault", async () => {
+      const result = await createClient<Database>(supabaseUrl, anonKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+        .storage
+        .from("admira-document-vault")
+        .list("anonymous");
+      if (!result.error) {
+        throw new Error("anonymous storage list unexpectedly succeeded");
+      }
+    });
+
     userAId = await createTestUser(service, emailA, password);
     userBId = await createTestUser(service, emailB, password);
     createdUserIds.push(userAId, userBId);
@@ -305,6 +362,39 @@ async function main() {
     const clientB = await signInAs(supabaseUrl, anonKey, emailB, password);
     const dbA = asHarnessDb(clientA);
     const dbB = asHarnessDb(clientB);
+
+    const commandTask = await insertSingle(dbA, "tasks", {
+      subject_id: userAId,
+      unitid: testUnitid,
+      requirement_key: `rls-${runId}:supplemental-app`,
+      title: "Complete supplemental application",
+      detail: "RLS harness task row.",
+      category: "form",
+      status: "todo",
+      source_url: "https://example.com/admira-rls-harness",
+    });
+    commandTaskId = String(commandTask.id);
+
+    const requirementStatus = await insertSingle(dbA, "requirement_status", {
+      subject_id: userAId,
+      unitid: testUnitid,
+      requirement_key: `rls-${runId}:supplemental-app`,
+      status: "in_progress",
+      source_url: "https://example.com/admira-rls-harness",
+    });
+    requirementStatusId = String(requirementStatus.id);
+
+    const document = await insertSingle(dbA, "documents", {
+      subject_id: userAId,
+      unitid: testUnitid,
+      requirement_key: `rls-${runId}:supplemental-app`,
+      storage_bucket: "admira-document-vault",
+      storage_path: `${userAId}/rls-${runId}.pdf`,
+      file_name: "rls-harness.pdf",
+      content_type: "application/pdf",
+      size_bytes: 128,
+    });
+    documentId = String(document.id);
 
     const consent = await insertSingle(dbA, "consent_records", {
       subject_id: userAId,
@@ -485,6 +575,31 @@ async function main() {
       }
     });
 
+    await runCheck(results, "User B cannot select User A task row", async () => {
+      const rows = await selectById(dbB, "tasks", commandTaskId);
+      if (rows.length !== 0) {
+        throw new Error(`expected 0 rows, got ${rows.length}`);
+      }
+    });
+
+    await runCheck(
+      results,
+      "User B cannot select User A requirement status row",
+      async () => {
+        const rows = await selectById(dbB, "requirement_status", requirementStatusId);
+        if (rows.length !== 0) {
+          throw new Error(`expected 0 rows, got ${rows.length}`);
+        }
+      },
+    );
+
+    await runCheck(results, "User B cannot select User A document row", async () => {
+      const rows = await selectById(dbB, "documents", documentId);
+      if (rows.length !== 0) {
+        throw new Error(`expected 0 rows, got ${rows.length}`);
+      }
+    });
+
     await runCheck(
       results,
       "User B cannot insert profile carrying User A subject_id",
@@ -512,6 +627,53 @@ async function main() {
           outcome: "denied",
           application_round: "regular",
           cycle_year: 2026,
+        });
+      },
+    );
+
+    await runCheck(
+      results,
+      "User B cannot insert task carrying User A subject_id",
+      async () => {
+        await expectRejected(dbB, "tasks", {
+          subject_id: userAId,
+          unitid: testUnitid,
+          requirement_key: `blocked-task-${runId}`,
+          title: "Blocked task",
+          category: "form",
+          status: "todo",
+          source_url: "https://example.com/admira-rls-harness",
+        });
+      },
+    );
+
+    await runCheck(
+      results,
+      "User B cannot insert requirement status carrying User A subject_id",
+      async () => {
+        await expectRejected(dbB, "requirement_status", {
+          subject_id: userAId,
+          unitid: testUnitid,
+          requirement_key: `blocked-status-${runId}`,
+          status: "todo",
+          source_url: "https://example.com/admira-rls-harness",
+        });
+      },
+    );
+
+    await runCheck(
+      results,
+      "User B cannot insert document carrying User A subject_id",
+      async () => {
+        await expectRejected(dbB, "documents", {
+          subject_id: userAId,
+          unitid: testUnitid,
+          requirement_key: `blocked-document-${runId}`,
+          storage_bucket: "admira-document-vault",
+          storage_path: `${userAId}/blocked-${runId}.pdf`,
+          file_name: "blocked.pdf",
+          content_type: "application/pdf",
+          size_bytes: 128,
         });
       },
     );
@@ -546,6 +708,43 @@ async function main() {
       const rows = await selectById(dbA, "application_outcomes", outcomeId);
       if (rows.length !== 1) {
         throw new Error("User A outcome row was not preserved");
+      }
+    });
+
+    await runCheck(results, "User B cannot delete User A task row", async () => {
+      const result = await deleteById(dbB, "tasks", commandTaskId);
+      if (!result.error && result.count !== 0) {
+        throw new Error(`expected 0 deleted rows, got ${result.count}`);
+      }
+      const rows = await selectById(dbA, "tasks", commandTaskId);
+      if (rows.length !== 1) {
+        throw new Error("User A task row was not preserved");
+      }
+    });
+
+    await runCheck(
+      results,
+      "User B cannot delete User A requirement status row",
+      async () => {
+        const result = await deleteById(dbB, "requirement_status", requirementStatusId);
+        if (!result.error && result.count !== 0) {
+          throw new Error(`expected 0 deleted rows, got ${result.count}`);
+        }
+        const rows = await selectById(dbA, "requirement_status", requirementStatusId);
+        if (rows.length !== 1) {
+          throw new Error("User A requirement status row was not preserved");
+        }
+      },
+    );
+
+    await runCheck(results, "User B cannot delete User A document row", async () => {
+      const result = await deleteById(dbB, "documents", documentId);
+      if (!result.error && result.count !== 0) {
+        throw new Error(`expected 0 deleted rows, got ${result.count}`);
+      }
+      const rows = await selectById(dbA, "documents", documentId);
+      if (rows.length !== 1) {
+        throw new Error("User A document row was not preserved");
       }
     });
 
@@ -630,12 +829,18 @@ async function main() {
     const scopedDeletes: Array<Promise<void>> = [];
 
     if (userAId) {
+      scopedDeletes.push(deleteByColumn(serviceDb, "documents", "subject_id", userAId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "requirement_status", "subject_id", userAId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "tasks", "subject_id", userAId));
       scopedDeletes.push(deleteByColumn(serviceDb, "consent_records", "subject_id", userAId));
       scopedDeletes.push(deleteByColumn(serviceDb, "applicant_profiles", "subject_id", userAId));
       scopedDeletes.push(deleteByColumn(serviceDb, "application_outcomes", "subject_id", userAId));
       scopedDeletes.push(deleteByColumn(serviceDb, "data_access_logs", "subject_id", userAId));
     }
     if (userBId) {
+      scopedDeletes.push(deleteByColumn(serviceDb, "documents", "subject_id", userBId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "requirement_status", "subject_id", userBId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "tasks", "subject_id", userBId));
       scopedDeletes.push(deleteByColumn(serviceDb, "consent_records", "subject_id", userBId));
       scopedDeletes.push(deleteByColumn(serviceDb, "applicant_profiles", "subject_id", userBId));
       scopedDeletes.push(deleteByColumn(serviceDb, "application_outcomes", "subject_id", userBId));

@@ -26,6 +26,8 @@ ADMIRA_CAPTURE_ALLOW_UNSIGNED_SUBJECT=false
 ADMIRA_REAL_MODEL_ENABLED=false
 ADMIRA_STUDENTS_LIKE_YOU_ENABLED=false
 ADMIRA_SLY_FEEDBACK_ENABLED=false
+ADMIRA_CLIMB_ENABLED=false
+ADMIRA_COMMAND_CENTER_ENABLED=false
 ```
 
 Analytics are no-op by default. When the debug flag is enabled, Admira writes sanitized product events to the browser console only: `page_view`, `profile_completed`, `school_added`, `methodology_viewed`, `fit_finder_viewed`, `fit_search_run`, and `fit_school_added`. The wrapper allowlists non-identifying booleans and counts only. It blocks GPA, SAT, ACT, scores, interests, majors, published cost values, school identifiers, names, state, email, phone, and zip-like fields.
@@ -35,6 +37,8 @@ Fit Finder is disabled by default. Keep `ADMIRA_FIT_FINDER_ENABLED=false` until 
 Outcome capture is disabled by default. Enable `ADMIRA_OUTCOME_CAPTURE_ENABLED=true` only after Supabase Auth, the Phase 6 migration, and the published consent text are in place. Keep `ADMIRA_CAPTURE_ALLOW_UNSIGNED_SUBJECT=false` in all hosted environments.
 
 Students-Like-You is disabled by default. Keep `ADMIRA_STUDENTS_LIKE_YOU_ENABLED=false` until the Phase 3 migration is applied and the consented outcome or curated-public seed data has been ingested. Keep `ADMIRA_SLY_FEEDBACK_ENABLED=false`; Phase 3 displays aggregate cohorts only and does not feed cohort outcomes back into Admit Intelligence scoring.
+
+Climb Roadmap and Application Command Center are disabled by default. Keep `ADMIRA_CLIMB_ENABLED=false` and `ADMIRA_COMMAND_CENTER_ENABLED=false` until the Phase 5 migration has been applied. The command center only shows dates from `application_deadlines` rows carrying `source_url`; missing rows render as deadline not loaded.
 
 ## Renamed env vars (Fitty -> Admira)
 
@@ -124,6 +128,8 @@ The browser school search uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPAB
 `/api/fit` and `/api/fit/explain` return 404 unless `ADMIRA_FIT_FINDER_ENABLED=true`. `/api/fit/explain` returns a fallback response when `ANTHROPIC_API_KEY` is not configured, so the product remains usable with structured reasons only.
 
 `/api/students-like-you` returns 404 unless `ADMIRA_STUDENTS_LIKE_YOU_ENABLED=true`. The API returns only k-anonymous aggregate cohorts from `public.match_similar_cohort`; sub-k cohorts are suppressed in SQL before the UI sees them.
+
+`/api/climb` returns 404 unless `ADMIRA_CLIMB_ENABLED=true`. `/api/command-center` and its document/status write routes return 404 unless `ADMIRA_COMMAND_CENTER_ENABLED=true`. Command-center writes require a signed-in Supabase owner bearer token and are saved through service-role routes into owner-isolated RLS tables.
 
 `ADMIRA_REAL_MODEL_ENABLED=true` switches `/api/chance` to `lib/model/artifacts.real.json` behind the same request/response contract. Leave it off until `pipeline/train_real.py --source supabase --export-active` has been run on enough consented outcomes and the calibration report has been reviewed.
 

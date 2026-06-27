@@ -606,6 +606,24 @@ async function mockStudentsLikeYouStatus(page: Page, enabled: boolean) {
   });
 }
 
+async function mockClimbStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/climb/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
+async function mockCommandCenterStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/command-center/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
 async function mockSupabaseAuth(page: Page) {
   const corsHeaders = {
     "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
@@ -737,6 +755,8 @@ async function addMitResult(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   await mockStudentsLikeYouStatus(page, false);
+  await mockClimbStatus(page, false);
+  await mockCommandCenterStatus(page, false);
 
   await page.route("**/api/chance", async (route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
@@ -1549,6 +1569,197 @@ test("renders Students-Like-You sub-k empty state when SQL suppresses the cohort
   );
   await expect(panel.getByTestId("sly-empty")).toContainText(
     "Minimum cohort size: 5",
+  );
+});
+
+test("renders Climb Roadmap computed deltas when the flag is enabled", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await mockClimbStatus(page, true);
+  await page.route("**/api/climb", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      profile: {
+        sat_score: 1540,
+        act_score: 35,
+        gpa: 3.95,
+        application_round: "regular",
+      },
+      schools: [{ unitid: 166683 }],
+    });
+    expect(JSON.stringify(body)).not.toContain("Robotics captain");
+    expect(body.profile).not.toHaveProperty("activity_context");
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        snapshot_key: "climb:test",
+        method: "score(after) - score(before)",
+        schools: [
+          {
+            school: {
+              unitid: 166683,
+              name: "Massachusetts Institute of Technology",
+            },
+            current: {
+              score: 3,
+              tier: "Reach",
+              probability: 0.032967,
+            },
+            moves: [],
+          },
+        ],
+        ranked_moves: [
+          {
+            id: "166683:test_score",
+            school: {
+              unitid: 166683,
+              name: "Massachusetts Institute of Technology",
+            },
+            lever: {
+              feature: "test_score",
+              label: "Test score",
+              kind: "controllable",
+            },
+            before: {
+              score: 3,
+              tier: "Reach",
+              probability: 0.032967,
+            },
+            after: {
+              score: 6,
+              tier: "Reach",
+              probability: 0.061,
+            },
+            delta_score: 3,
+            crosses_tier: false,
+            tier_claim: null,
+            counterfactual: {
+              sat_score: 1590,
+            },
+            direction: "Rerun the public-prior scorer with SAT 50 points higher.",
+            note: "Computed by rescoring this exact school.",
+          },
+        ],
+        context: [
+          {
+            feature: "essays",
+            label: "Essays",
+            kind: "unseen",
+            note: "Context only.",
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("GPA").fill("3.95");
+  await page.getByLabel("SAT").fill("1540");
+  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await page.getByLabel("Activities and context").fill("Robotics captain");
+  await page.getByLabel("Intended major").fill("Computer science");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.getByLabel("Search by school name").fill("Massachusetts");
+  await page
+    .getByRole("button", { name: /Massachusetts Institute of Technology/ })
+    .click();
+
+  const panel = page.getByTestId("climb-panel");
+  await panel.getByTestId("climb-run").click();
+  await expect(panel.getByTestId("climb-results")).toContainText("Test score");
+  await expect(panel.getByTestId("climb-results")).toContainText("+3");
+  await expect(panel.getByTestId("climb-results")).toContainText("3 → 6");
+  await expect(panel.getByTestId("climb-results")).toContainText(
+    "Essays: context only",
+  );
+});
+
+test("renders Command Center requirements and deadline-not-loaded state", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await mockCommandCenterStatus(page, true);
+  await page.route("**/api/command-center", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      schools: [{ unitid: 166683 }],
+    });
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        progress: {
+          total: 2,
+          done: 1,
+          percent: 50,
+        },
+        schools: [
+          {
+            school: {
+              unitid: 166683,
+              name: "Massachusetts Institute of Technology",
+              country: "US",
+              admission_system: "direct",
+            },
+            tasks: [
+              {
+                id: "166683:testing",
+                unitid: 166683,
+                program_requirement_id: null,
+                requirement_key: "testing",
+                title: "Submit required test scores",
+                detail: "Loaded requirement from the school row.",
+                category: "testing",
+                status: "done",
+                due_date: null,
+                source_url: "https://example.com/requirements",
+              },
+              {
+                id: "166683:supplement",
+                unitid: 166683,
+                program_requirement_id: null,
+                requirement_key: "supplement",
+                title: "Complete supplemental application",
+                detail: "Loaded requirement from program_requirements.",
+                category: "form",
+                status: "todo",
+                due_date: null,
+                source_url: "https://example.com/requirements",
+              },
+            ],
+            deadline: {
+              status: "not_loaded",
+              label: "Deadline not loaded",
+            },
+          },
+        ],
+        documents: [],
+      }),
+    });
+  });
+
+  await addMitResult(page);
+  const panel = page.getByTestId("command-center-panel");
+  await panel.getByTestId("command-center-run").click();
+  await expect(panel.getByTestId("command-center-results")).toContainText(
+    "1/2 complete",
+  );
+  await expect(panel.getByTestId("command-center-results")).toContainText(
+    "Deadline not loaded",
+  );
+  await expect(panel.getByTestId("command-center-results")).toContainText(
+    "Complete supplemental application",
+  );
+  await expect(panel.getByTestId("command-center-results")).toContainText(
+    "0 uploaded",
   );
 });
 

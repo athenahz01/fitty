@@ -1449,6 +1449,261 @@ button {
   line-height: 1.25;
 }
 
+.climb-panel,
+.command-panel {
+  display: grid;
+  gap: 16px;
+  border-radius: var(--r-card);
+  background: var(--warm-card);
+  box-shadow: var(--paper-shadow);
+  padding: 20px;
+}
+
+.phase5-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.phase5-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 14px;
+}
+
+.climb-results,
+.command-results {
+  display: grid;
+  gap: 14px;
+}
+
+.climb-hero {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  overflow: hidden;
+  border-radius: var(--r-panel);
+  background: var(--fit-wash);
+  color: var(--fit-ink);
+  padding: 16px 88px 16px 16px;
+}
+
+.climb-hero strong {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.05;
+}
+
+.impact-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-grid;
+  min-width: 58px;
+  height: 42px;
+  place-items: center;
+  border-radius: var(--r-control);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 18px;
+}
+
+.climb-move-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.climb-move {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 14px;
+}
+
+.climb-move strong,
+.task-card strong,
+.vault-panel strong,
+.command-progress strong {
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.climb-move p,
+.task-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.climb-scorebox {
+  display: grid;
+  gap: 3px;
+  min-width: 96px;
+  border-radius: var(--r-control);
+  background: var(--control-bg);
+  padding: 10px;
+  text-align: right;
+}
+
+.climb-scorebox em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.climb-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.climb-context span {
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.command-progress {
+  display: grid;
+  gap: 8px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 14px;
+}
+
+.command-meter {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--control-bg);
+}
+
+.command-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fit-green);
+}
+
+.deadline-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deadline-strip div {
+  display: grid;
+  gap: 3px;
+  border-radius: var(--r-control);
+  background: var(--target-wash);
+  color: #854d0e;
+  padding: 12px;
+}
+
+.deadline-strip span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.task-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  border-radius: var(--r-panel);
+  background: var(--control-bg);
+  padding: 10px;
+}
+
+.task-column h4 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.task-card {
+  display: grid;
+  gap: 5px;
+  border-radius: var(--r-control);
+  background: var(--warm-card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 12px;
+}
+
+.task-card div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 11px;
+}
+
+.task-card a {
+  color: var(--chance-primary);
+  text-decoration: none;
+}
+
+.vault-panel {
+  display: grid;
+  gap: 10px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 14px;
+}
+
+.vault-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vault-upload input {
+  min-width: 0;
+  flex: 1;
+  border-radius: var(--r-control);
+  background: var(--control-bg);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 9px;
+}
+
+.vault-panel ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .icon-button {
   display: inline-grid;
   width: 42px;
@@ -3805,12 +4060,15 @@ button {
   .balance-grid,
   .capture-steps,
   .sly-outcome-grid,
-  .sly-card-grid {
+  .sly-card-grid,
+  .deadline-strip,
+  .kanban-grid {
     grid-template-columns: 1fr;
   }
 
   .fit-score-layout,
   .climb-row,
+  .climb-move,
   .blind-spot-list,
   .fit-dimension-list li,
   .admit-score-reveal,
@@ -3822,6 +4080,11 @@ button {
 
   .fit-score-readout {
     justify-items: start;
+  }
+
+  .climb-scorebox {
+    width: 100%;
+    text-align: left;
   }
 
   .fit-overlap-venn {
