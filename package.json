@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "ingest:canada": "python pipeline/ingest/ingest_canada_seed.py",
+    "ingest:sly-seed": "node --import tsx pipeline/ingest/ingest_students_like_you_seed.ts",
     "score:canada-holdout": "node --import tsx pipeline/score_canada_holdout.ts",
     "verify:phase0:migration": "node --import tsx pipeline/audit/verify_phase0_migration.ts",
     "train:real": "python pipeline/train_real.py",

@@ -312,8 +312,54 @@ type FitExplanationState = {
   reason?: string;
 };
 
+type SimilarCohort = {
+  unitid: number;
+  school_name: string;
+  cohort_size: number;
+  outcomes: {
+    admitted: number;
+    denied: number;
+    waitlisted: number;
+    deferred: number;
+  };
+  rates: {
+    admitted: number;
+    denied: number;
+    waitlisted: number;
+    deferred: number;
+  };
+  attribute_cards: Array<{
+    kind: string;
+    label: string;
+    value: string;
+    count: number;
+  }>;
+  admit_insights: Array<{
+    label: string;
+    value: string;
+    count: number;
+  }>;
+  provenance: {
+    curated_public: number;
+    consented_user: number;
+    source_urls: string[];
+  };
+};
+
+type StudentsLikeYouResponse = {
+  status: "ready" | "empty";
+  k: number;
+  message?: string;
+  cohorts: SimilarCohort[];
+  feedback: {
+    enabled: false;
+    reason: string;
+  };
+};
+
 type FitFinderStatus = "checking" | "enabled" | "disabled";
 type AdmitIntelligenceStatus = "checking" | "enabled" | "disabled";
+type StudentsLikeYouStatus = "checking" | "enabled" | "disabled";
 
 const initialProfile: Profile = {
   gpa: "3.85",
@@ -775,6 +821,45 @@ function buildFitBody(profile: Profile, preferences: FitPreferences) {
   };
 }
 
+function activityTierForSimilarity(profile: Profile) {
+  const length = profile.activityNote.trim().length;
+  if (length >= 160) {
+    return "national";
+  }
+  if (length >= 90) {
+    return "state";
+  }
+  if (length >= 35) {
+    return "regional";
+  }
+  return "unknown";
+}
+
+function buildStudentsLikeYouBody(profile: Profile, unitid?: number) {
+  const chanceBody = buildChanceBody(profile, unitid ?? 0);
+  const intendedMajor = intendedMajorForRequest(profile);
+
+  return {
+    ...(unitid !== undefined ? { unitid } : {}),
+    profile: {
+      cycle_year: 2026,
+      ...(chanceBody.gpa !== undefined ? { gpa: chanceBody.gpa } : {}),
+      ...(chanceBody.sat_score !== undefined
+        ? { sat_score: chanceBody.sat_score }
+        : {}),
+      ...(chanceBody.act_score !== undefined
+        ? { act_score: chanceBody.act_score }
+        : {}),
+      test_submitted: !profile.notSubmittingTests,
+      course_rigor: "unknown",
+      activities_tier: activityTierForSimilarity(profile),
+      ...(intendedMajor ? { intended_major: intendedMajor } : {}),
+      application_round: profile.applicationRound,
+      demonstrated_interest: "unknown",
+    },
+  };
+}
+
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value * 100));
 }
@@ -822,6 +907,8 @@ export function AdmiraApp() {
     useState<FitFinderStatus>("checking");
   const [admitIntelligenceStatus, setAdmitIntelligenceStatus] =
     useState<AdmitIntelligenceStatus>("checking");
+  const [studentsLikeYouStatus, setStudentsLikeYouStatus] =
+    useState<StudentsLikeYouStatus>("checking");
   const [listBuilderStatus, setListBuilderStatus] = useState<
     "checking" | "enabled" | "disabled"
   >("checking");
@@ -871,6 +958,23 @@ export function AdmiraApp() {
       }
     }
 
+    async function loadStudentsLikeYouStatus() {
+      try {
+        const response = await fetch("/api/students-like-you/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setStudentsLikeYouStatus(
+          payload?.enabled === true ? "enabled" : "disabled",
+        );
+      } catch {
+        if (active) {
+          setStudentsLikeYouStatus("disabled");
+        }
+      }
+    }
+
     async function loadListBuilderStatus() {
       try {
         const response = await fetch("/api/list/status");
@@ -890,6 +994,7 @@ export function AdmiraApp() {
 
     void loadAdmitIntelligenceStatus();
     void loadFitFinderStatus();
+    void loadStudentsLikeYouStatus();
     void loadListBuilderStatus();
 
     return () => {
@@ -1145,6 +1250,9 @@ export function AdmiraApp() {
             ) : null}
             {listBuilderStatus === "enabled" ? (
               <ListBuilderPanel profile={profile} setProfile={setProfile} />
+            ) : null}
+            {studentsLikeYouStatus === "enabled" ? (
+              <StudentsLikeYouPanel profile={profile} />
             ) : null}
             <SchoolSearchPanel
               query={schoolQuery}
@@ -1850,6 +1958,190 @@ function ListBuilderPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function StudentsLikeYouPanel({ profile }: { profile: Profile }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [response, setResponse] = useState<StudentsLikeYouResponse | null>(null);
+  const [error, setError] = useState("");
+
+  async function runCohort() {
+    setStatus("loading");
+    setError("");
+    setResponse(null);
+
+    try {
+      const httpResponse = await fetch("/api/students-like-you", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildStudentsLikeYouBody(profile)),
+      });
+      const payload = await httpResponse.json();
+
+      if (!httpResponse.ok) {
+        throw new Error(payload?.error ?? "Students-Like-You request failed.");
+      }
+
+      setResponse(payload as StudentsLikeYouResponse);
+      setStatus("ready");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Students-Like-You request failed.",
+      );
+      setStatus("error");
+    }
+  }
+
+  const firstCohort = response?.cohorts[0];
+
+  return (
+    <section className="sly-panel" data-testid="sly-panel">
+      <div className="sly-head">
+        <div>
+          <div className="section-kicker">Students Like You</div>
+          <h3 className="section-title">See where similar profiles landed.</h3>
+        </div>
+        <button
+          type="button"
+          className="add-button sly-run"
+          onClick={runCohort}
+          disabled={status === "loading"}
+          data-testid="sly-run"
+        >
+          {status === "loading" ? (
+            <Loader2 className="spin" size={16} />
+          ) : (
+            <Sparkles size={16} />
+          )}
+          Match cohort
+        </button>
+      </div>
+
+      {status === "idle" ? (
+        <p className="helper">
+          Cohorts open only after at least five consented records survive the
+          database privacy gate.
+        </p>
+      ) : null}
+
+      {status === "error" ? (
+        <p className="error-copy" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {response?.status === "empty" ? (
+        <div className="sly-empty" data-testid="sly-empty">
+          <AlertTriangle size={17} aria-hidden="true" />
+          <strong>{response.message ?? "Not enough similar students yet."}</strong>
+          <span>Minimum cohort size: {response.k}</span>
+        </div>
+      ) : null}
+
+      {firstCohort ? (
+        <div className="sly-results" data-testid="sly-results">
+          <div className="sly-hero">
+            <span className="micro-label">Closest k-safe cohort</span>
+            <strong>{firstCohort.school_name}</strong>
+            <span>{firstCohort.cohort_size} similar records</span>
+          </div>
+          <OutcomeDistribution cohort={firstCohort} />
+          <SimilarAttributeCards cards={firstCohort.attribute_cards} />
+          <AdmitInsightStrip insights={firstCohort.admit_insights} />
+          <p className="helper">
+            Provenance: {firstCohort.provenance.consented_user} consented user
+            records, {firstCohort.provenance.curated_public} curated public
+            launch records.
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function OutcomeDistribution({ cohort }: { cohort: SimilarCohort }) {
+  const segments = [
+    { key: "admitted", label: "Admit", count: cohort.outcomes.admitted },
+    { key: "denied", label: "Deny", count: cohort.outcomes.denied },
+    { key: "waitlisted", label: "Waitlist", count: cohort.outcomes.waitlisted },
+    { key: "deferred", label: "Defer", count: cohort.outcomes.deferred },
+  ] as const;
+
+  return (
+    <section
+      className="sly-distribution"
+      aria-label={`${cohort.school_name} outcome distribution`}
+    >
+      <div className="sly-bars" aria-hidden="true">
+        {segments.map((segment) =>
+          segment.count > 0 ? (
+            <span
+              key={segment.key}
+              data-outcome={segment.key}
+              style={{ flexGrow: segment.count }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div className="sly-outcome-grid">
+        {segments.map((segment) => (
+          <span key={segment.key} data-outcome={segment.key}>
+            <strong>{segment.count}</strong>
+            {segment.label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SimilarAttributeCards({ cards }: { cards: SimilarCohort["attribute_cards"] }) {
+  if (cards.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="sly-card-grid" aria-label="k-safe similar student attributes">
+      {cards.slice(0, 4).map((card) => (
+        <li key={`${card.kind}-${card.value}`}>
+          <span className="micro-label">{card.label}</span>
+          <strong>{card.value}</strong>
+          <span>{card.count} records</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AdmitInsightStrip({
+  insights,
+}: {
+  insights: SimilarCohort["admit_insights"];
+}) {
+  if (insights.length === 0) {
+    return (
+      <div className="sly-insights" data-testid="sly-insights">
+        <span className="micro-label">What admits had in common</span>
+        <strong>Suppressed until the admit subgroup reaches k.</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sly-insights" data-testid="sly-insights">
+      <span className="micro-label">What admits had in common</span>
+      <strong>
+        {insights
+          .slice(0, 2)
+          .map((insight) => `${insight.value} (${insight.count})`)
+          .join(" + ")}
+      </strong>
+    </div>
   );
 }
 

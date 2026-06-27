@@ -597,6 +597,15 @@ async function mockAdmitIntelligenceStatus(page: Page, enabled: boolean) {
   });
 }
 
+async function mockStudentsLikeYouStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/students-like-you/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
 async function mockSupabaseAuth(page: Page) {
   const corsHeaders = {
     "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
@@ -727,6 +736,8 @@ async function addMitResult(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await mockStudentsLikeYouStatus(page, false);
+
   await page.route("**/api/chance", async (route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
 
@@ -1400,6 +1411,145 @@ test("renders Admit Intelligence for a Canadian program when the flag is enabled
   await expect(card).toContainText("Prerequisites");
   await expect(card.locator(".profile-studio-radar svg")).toBeVisible();
   expect(admitRequests).toBe(1);
+});
+
+test("renders Students-Like-You k-safe aggregates when the flag is enabled", async ({
+  page,
+}) => {
+  let slyRequests = 0;
+
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await mockStudentsLikeYouStatus(page, true);
+  await page.route("**/api/students-like-you", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      profile: {
+        cycle_year: 2026,
+        gpa: 3.95,
+        sat_score: 1540,
+        act_score: 35,
+        test_submitted: true,
+        intended_major: "Computer science",
+        application_round: "regular",
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("Robotics captain");
+    expect(body.profile).not.toHaveProperty("activity_context");
+    expectNoForbiddenKeys(body);
+    slyRequests += 1;
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ready",
+        k: 5,
+        query: {
+          embedded: true,
+          dim: 384,
+          model: "Xenova/all-MiniLM-L6-v2",
+        },
+        cohorts: [
+          {
+            unitid: 166683,
+            school_name: "Massachusetts Institute of Technology",
+            cohort_size: 5,
+            outcomes: {
+              admitted: 2,
+              denied: 2,
+              waitlisted: 1,
+              deferred: 0,
+            },
+            rates: {
+              admitted: 0.4,
+              denied: 0.4,
+              waitlisted: 0.2,
+              deferred: 0,
+            },
+            attribute_cards: [
+              { kind: "gpa", label: "GPA band", value: "3.75-3.99", count: 5 },
+              { kind: "rigor", label: "Course rigor", value: "AP IB Dual", count: 5 },
+            ],
+            admit_insights: [
+              { label: "Admitted rigor", value: "Most Rigorous", count: 5 },
+            ],
+            provenance: {
+              curated_public: 5,
+              consented_user: 0,
+              source_urls: ["https://mitadmissions.org/apply/process/stats/"],
+            },
+          },
+        ],
+        feedback: {
+          enabled: false,
+          reason: "Feedback loop is off.",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  const panel = page.getByTestId("sly-panel");
+  await expect(panel).toContainText("Students Like You");
+  await page.getByLabel("GPA").fill("3.95");
+  await page.getByLabel("SAT").fill("1540");
+  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await page.getByLabel("Intended major").fill("Computer science");
+  await page
+    .getByPlaceholder(/Robotics captain/)
+    .fill("Robotics captain and research internship.");
+  await panel.getByTestId("sly-run").click();
+
+  await expect(panel.getByTestId("sly-results")).toContainText(
+    "Massachusetts Institute of Technology",
+  );
+  await expect(panel.getByTestId("sly-results")).toContainText(
+    "5 similar records",
+  );
+  await expect(panel).toContainText("GPA band");
+  await expect(panel.getByTestId("sly-insights")).toContainText("Most Rigorous");
+  expect(slyRequests).toBe(1);
+});
+
+test("renders Students-Like-You sub-k empty state when SQL suppresses the cohort", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await mockStudentsLikeYouStatus(page, true);
+  await page.route("**/api/students-like-you", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "empty",
+        k: 5,
+        message: "Not enough similar students yet.",
+        query: {
+          embedded: true,
+          dim: 384,
+          model: "Xenova/all-MiniLM-L6-v2",
+        },
+        cohorts: [],
+        feedback: {
+          enabled: false,
+          reason: "Feedback loop is off.",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  const panel = page.getByTestId("sly-panel");
+  await panel.getByTestId("sly-run").click();
+  await expect(panel.getByTestId("sly-empty")).toContainText(
+    "Not enough similar students yet.",
+  );
+  await expect(panel.getByTestId("sly-empty")).toContainText(
+    "Minimum cohort size: 5",
+  );
 });
 
 test("renders an honest elite-school result and methodology disclosure", async ({

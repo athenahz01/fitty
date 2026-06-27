@@ -24,6 +24,8 @@ ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 ADMIRA_OUTCOME_CAPTURE_ENABLED=false
 ADMIRA_CAPTURE_ALLOW_UNSIGNED_SUBJECT=false
 ADMIRA_REAL_MODEL_ENABLED=false
+ADMIRA_STUDENTS_LIKE_YOU_ENABLED=false
+ADMIRA_SLY_FEEDBACK_ENABLED=false
 ```
 
 Analytics are no-op by default. When the debug flag is enabled, Admira writes sanitized product events to the browser console only: `page_view`, `profile_completed`, `school_added`, `methodology_viewed`, `fit_finder_viewed`, `fit_search_run`, and `fit_school_added`. The wrapper allowlists non-identifying booleans and counts only. It blocks GPA, SAT, ACT, scores, interests, majors, published cost values, school identifiers, names, state, email, phone, and zip-like fields.
@@ -31,6 +33,8 @@ Analytics are no-op by default. When the debug flag is enabled, Admira writes sa
 Fit Finder is disabled by default. Keep `ADMIRA_FIT_FINDER_ENABLED=false` until the target Supabase project has the Phase 1 school enrichment and embeddings populated. `ANTHROPIC_API_KEY` is optional; without it, Fit Finder still renders structured reasons and skips the Claude prose.
 
 Outcome capture is disabled by default. Enable `ADMIRA_OUTCOME_CAPTURE_ENABLED=true` only after Supabase Auth, the Phase 6 migration, and the published consent text are in place. Keep `ADMIRA_CAPTURE_ALLOW_UNSIGNED_SUBJECT=false` in all hosted environments.
+
+Students-Like-You is disabled by default. Keep `ADMIRA_STUDENTS_LIKE_YOU_ENABLED=false` until the Phase 3 migration is applied and the consented outcome or curated-public seed data has been ingested. Keep `ADMIRA_SLY_FEEDBACK_ENABLED=false`; Phase 3 displays aggregate cohorts only and does not feed cohort outcomes back into Admit Intelligence scoring.
 
 ## Renamed env vars (Fitty -> Admira)
 
@@ -94,6 +98,14 @@ npm run fit:embedding-sanity
 
 Only after those pass should you set `ADMIRA_FIT_FINDER_ENABLED=true`.
 
+For Students-Like-You, apply the Phase 3 migration and ingest the curated-public seed only into environments where this aggregate display feature should be tested:
+
+```powershell
+npm run ingest:sly-seed
+```
+
+Every seed row carries `provenance: "curated_public"` and a `source_url`; live outcome-capture rows remain gated by active modeling consent.
+
 ## Vercel Deployment
 
 1. Import the repository into Vercel.
@@ -110,6 +122,8 @@ npm run build
 The browser school search uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The server route `/api/chance` uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to load the selected school before applying the checked-in TypeScript inference artifact.
 
 `/api/fit` and `/api/fit/explain` return 404 unless `ADMIRA_FIT_FINDER_ENABLED=true`. `/api/fit/explain` returns a fallback response when `ANTHROPIC_API_KEY` is not configured, so the product remains usable with structured reasons only.
+
+`/api/students-like-you` returns 404 unless `ADMIRA_STUDENTS_LIKE_YOU_ENABLED=true`. The API returns only k-anonymous aggregate cohorts from `public.match_similar_cohort`; sub-k cohorts are suppressed in SQL before the UI sees them.
 
 `ADMIRA_REAL_MODEL_ENABLED=true` switches `/api/chance` to `lib/model/artifacts.real.json` behind the same request/response contract. Leave it off until `pipeline/train_real.py --source supabase --export-active` has been run on enough consented outcomes and the calibration report has been reviewed.
 

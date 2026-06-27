@@ -1290,6 +1290,165 @@ button {
   color: var(--chance-ink);
 }
 
+.sly-panel {
+  display: grid;
+  gap: 16px;
+  border-radius: var(--r-card);
+  background: var(--warm-card);
+  box-shadow: var(--paper-shadow);
+  padding: 20px;
+}
+
+.sly-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sly-run {
+  flex: none;
+}
+
+.sly-empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: center;
+  border-radius: var(--r-panel);
+  background: var(--chance-wash);
+  color: var(--chance-ink);
+  padding: 14px;
+}
+
+.sly-empty span {
+  grid-column: 2;
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+}
+
+.sly-results {
+  display: grid;
+  gap: 14px;
+}
+
+.sly-hero {
+  display: grid;
+  gap: 3px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 16px;
+}
+
+.sly-hero strong {
+  color: var(--ink);
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1.05;
+}
+
+.sly-hero span:last-child {
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+}
+
+.sly-distribution {
+  display: grid;
+  gap: 10px;
+}
+
+.sly-bars {
+  display: flex;
+  overflow: hidden;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--control-bg);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.sly-bars span[data-outcome="admitted"] {
+  background: var(--fit-green);
+}
+
+.sly-bars span[data-outcome="denied"] {
+  background: var(--chance-primary);
+}
+
+.sly-bars span[data-outcome="waitlisted"] {
+  background: #eab308;
+}
+
+.sly-bars span[data-outcome="deferred"] {
+  background: var(--school-indigo);
+}
+
+.sly-outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sly-outcome-grid span {
+  display: grid;
+  gap: 2px;
+  border-radius: var(--r-control);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 9px;
+}
+
+.sly-outcome-grid strong {
+  color: var(--ink);
+  font-family: var(--font-data), monospace;
+  font-size: 18px;
+}
+
+.sly-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sly-card-grid li {
+  display: grid;
+  gap: 3px;
+  border-radius: var(--r-panel);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  padding: 13px;
+}
+
+.sly-card-grid strong {
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.sly-card-grid span:last-child {
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+}
+
+.sly-insights {
+  display: grid;
+  gap: 4px;
+  border-radius: var(--r-panel);
+  background: var(--likely-wash);
+  color: var(--fit-ink);
+  padding: 14px;
+}
+
+.sly-insights strong {
+  line-height: 1.25;
+}
+
 .icon-button {
   display: inline-grid;
   width: 42px;
@@ -3644,7 +3803,9 @@ button {
 
   .field-pair,
   .balance-grid,
-  .capture-steps {
+  .capture-steps,
+  .sly-outcome-grid,
+  .sly-card-grid {
     grid-template-columns: 1fr;
   }
 

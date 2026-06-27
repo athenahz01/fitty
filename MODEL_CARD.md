@@ -1,4 +1,4 @@
-# Admira Phase 2 Model Card
+# Admira V2 Model Card
 
 ## Model
 
@@ -118,6 +118,52 @@ rail and the note says so. The previously over-claimed Fit and Extracurricular
 axes are now labeled plainly as heuristics. The `/api/admit-intelligence` route
 returns a 400 (not a 500) when the applicant basis does not match a Canadian
 program's native `cutoff_basis`.
+
+## Phase 3 Students-Like-You
+
+Students-Like-You is feature-flagged by `ADMIRA_STUDENTS_LIKE_YOU_ENABLED`
+(default false). It is a display engine over consented outcome records, not an
+input to Admit Intelligence. The separate `ADMIRA_SLY_FEEDBACK_ENABLED` flag is
+also default false; Phase 3 intentionally does not wire cohort outcomes back into
+any scoring path.
+
+The privacy threshold is **k = 5** distinct consented subjects. This is enforced
+inside SQL by `public.match_similar_cohort` in
+`supabase/migrations/202606270001_v2_phase3_students_like_you.sql` with
+`having count(distinct subject_id) >= 5` after similarity matching and school
+grouping. The API and UI also suppress sub-k rows, but those are secondary
+guards; the database function is the first gate.
+
+Consent is enforced at storage time by the existing
+`require_active_modeling_consent` trigger and at cohort time by the SQL join to
+`consent_records` where `purpose = 'real_outcome_modeling'` and `revoked_at is
+null`. Revoking consent removes that record from future cohorts immediately; if
+that drops a cohort below five records, the SQL function returns no row.
+
+Profile matching uses the existing Xenova MiniLM embedding model, but the
+embedded document contains only controlled or banded fields: cycle year, GPA
+band, test band, course-rigor bucket, activity bucket, application round,
+demonstrated-interest bucket, and whether a major was supplied. Activity text,
+raw intended-major text, subject IDs, names, emails, and forbidden demographics
+are never embedded or returned.
+
+Returned cohort data is aggregate only: per-school admit/deny/waitlist/defer
+counts and rates, broad attribute cards, and "what admits had in common" strips.
+Attribute cards and admit insights are themselves suppressed unless that bucket
+has at least five distinct subjects. Similar-student cards are aggregate bucket
+cards, not individual rows.
+
+The launch seed at `pipeline/data/students_like_you_seed.json` is deterministic
+and tagged `provenance: "curated_public"` with a `source_url` on every row. These
+are aggregate-derived archetypes documented in `pipeline/data/SOURCES.md`, not
+real users. Real outcome-capture records default to `provenance: "consented_user"`
+and participate only while active consent remains unrevoked.
+
+No self-leakage: the SQL function accepts `p_exclude_subject_id` and
+`p_exclude_cycle_year`; the API passes the signed-in subject when a bearer token
+is present. The current phase excludes the user's own same-cycle rows from
+display cohorts and leaves scoring feedback off for a later, separately audited
+phase.
 
 ## Intended Use
 

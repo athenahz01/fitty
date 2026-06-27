@@ -48,6 +48,10 @@ type HarnessDb = {
       };
     };
   };
+  rpc(
+    fn: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<QueryResult<Row[]>>;
 };
 
 const requiredTarget = "staging";
@@ -207,6 +211,13 @@ async function main() {
   const emailB = `${subjectBEmailPrefix}-${runId}@example.com`;
   const testUnitid = -Math.floor(100000000 + Math.random() * 800000000);
   const blockedSchoolUnitid = testUnitid - 1;
+  const cohortVector = `[${Array.from({ length: 384 }, (_, index) =>
+    index === 0 ? "1.00000000" : "0.00000000",
+  ).join(",")}]`;
+  const cohortSubjectIds = Array.from({ length: 5 }, () => randomUUID());
+  const cohortConsentIds = Array.from({ length: 5 }, () => randomUUID());
+  const cohortProfileIds = Array.from({ length: 5 }, () => randomUUID());
+  const cohortOutcomeIds = Array.from({ length: 5 }, () => randomUUID());
   const service = createSupabaseServiceRoleClient();
   const serviceDb = asHarnessDb(service);
   const anonymousDb = asHarnessDb(
@@ -239,6 +250,22 @@ async function main() {
       c7_factors: {},
       selectivity_tier: "accessible",
     });
+
+    await runCheck(
+      results,
+      "Anonymous cannot execute similar cohort RPC",
+      async () => {
+        const result = await anonymousDb.rpc("match_similar_cohort", {
+          p_profile_embedding: cohortVector,
+          p_unitid: testUnitid,
+          p_k: 5,
+          p_match_count: 20,
+        });
+        if (!result.error) {
+          throw new Error("anonymous similar cohort RPC unexpectedly succeeded");
+        }
+      },
+    );
 
     await runCheck(results, "Anonymous cannot insert public school rows", async () => {
       await expectRejected(anonymousDb, "schools", {
@@ -315,6 +342,127 @@ async function main() {
       cycle_year: 2026,
     });
     outcomeId = String(outcome.id);
+
+    const cohortConsentRows = cohortSubjectIds.map((subjectId, index) => ({
+      id: cohortConsentIds[index],
+      subject_id: subjectId,
+      consent_version: `rls-sly-${runId}`,
+      consent_text:
+        "I consent to this staging-only RLS harness storing temporary k-anonymity cohort rows.",
+      purpose: "real_outcome_modeling",
+      revoked_at: null,
+    }));
+    const cohortProfileRows = cohortSubjectIds.map((subjectId, index) => ({
+      id: cohortProfileIds[index],
+      subject_id: subjectId,
+      consent_record_id: cohortConsentIds[index],
+      cycle_year: 2026,
+      gpa: 3.8 + index * 0.01,
+      course_rigor: "ap_ib_dual",
+      sat_score: 1450 + index * 10,
+      act_score: 32,
+      test_submitted: true,
+      activities_tier: "state",
+      intended_major: "RLS Harness",
+      application_round: "regular",
+      demonstrated_interest: "moderate",
+      profile_embedding: cohortVector,
+      profile_embedding_model: "rls-harness-vector",
+      provenance: "consented_user",
+      source_url: null,
+    }));
+    const cohortOutcomeRows = cohortSubjectIds.map((subjectId, index) => ({
+      id: cohortOutcomeIds[index],
+      subject_id: subjectId,
+      profile_id: cohortProfileIds[index],
+      consent_record_id: cohortConsentIds[index],
+      unitid: testUnitid,
+      outcome: index < 3 ? "admitted" : "denied",
+      application_round: "regular",
+      cycle_year: 2026,
+      provenance: "consented_user",
+      source_url: null,
+    }));
+
+    await insertRows(serviceDb, "consent_records", cohortConsentRows.slice(0, 4));
+    await insertRows(serviceDb, "applicant_profiles", cohortProfileRows.slice(0, 4));
+    await insertRows(serviceDb, "application_outcomes", cohortOutcomeRows.slice(0, 4));
+
+    await runCheck(
+      results,
+      "Similar cohort suppresses fewer than five consented records",
+      async () => {
+        const result = await serviceDb.rpc("match_similar_cohort", {
+          p_profile_embedding: cohortVector,
+          p_unitid: testUnitid,
+          p_k: 5,
+          p_match_count: 20,
+        });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+        if ((result.data ?? []).length !== 0) {
+          throw new Error("sub-k similar cohort returned rows");
+        }
+      },
+    );
+
+    await insertRows(serviceDb, "consent_records", cohortConsentRows[4]);
+    await insertRows(serviceDb, "applicant_profiles", cohortProfileRows[4]);
+    await insertRows(serviceDb, "application_outcomes", cohortOutcomeRows[4]);
+
+    await runCheck(
+      results,
+      "Similar cohort returns only k-anonymous aggregates",
+      async () => {
+        const result = await serviceDb.rpc("match_similar_cohort", {
+          p_profile_embedding: cohortVector,
+          p_unitid: testUnitid,
+          p_k: 5,
+          p_match_count: 20,
+        });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+        if ((result.data ?? []).length !== 1) {
+          throw new Error(`expected 1 k-anonymous row, got ${result.data?.length ?? 0}`);
+        }
+        const serialized = JSON.stringify(result.data).toLowerCase();
+        if (serialized.includes("subject_id") || serialized.includes("profile_id")) {
+          throw new Error("similar cohort returned private identifiers");
+        }
+      },
+    );
+
+    const revokeCohortResult = await serviceDb
+      .from("consent_records")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", cohortConsentIds[4])
+      .eq("subject_id", cohortSubjectIds[4])
+      .select("id")
+      .single();
+    if (revokeCohortResult.error) {
+      throw new Error(revokeCohortResult.error.message);
+    }
+
+    await runCheck(
+      results,
+      "Revoked consent drops similar cohort below k immediately",
+      async () => {
+        const result = await serviceDb.rpc("match_similar_cohort", {
+          p_profile_embedding: cohortVector,
+          p_unitid: testUnitid,
+          p_k: 5,
+          p_match_count: 20,
+        });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+        if ((result.data ?? []).length !== 0) {
+          throw new Error("revoked cohort row still appeared in similar cohort");
+        }
+      },
+    );
 
     await runCheck(results, "User B cannot select User A consent row", async () => {
       const rows = await selectById(dbB, "consent_records", consentId);
@@ -492,6 +640,12 @@ async function main() {
       scopedDeletes.push(deleteByColumn(serviceDb, "applicant_profiles", "subject_id", userBId));
       scopedDeletes.push(deleteByColumn(serviceDb, "application_outcomes", "subject_id", userBId));
       scopedDeletes.push(deleteByColumn(serviceDb, "data_access_logs", "subject_id", userBId));
+    }
+    for (const subjectId of cohortSubjectIds) {
+      scopedDeletes.push(deleteByColumn(serviceDb, "consent_records", "subject_id", subjectId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "applicant_profiles", "subject_id", subjectId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "application_outcomes", "subject_id", subjectId));
+      scopedDeletes.push(deleteByColumn(serviceDb, "data_access_logs", "subject_id", subjectId));
     }
     const cleanupResults = await Promise.allSettled(scopedDeletes);
     cleanupResults.forEach((result) => {

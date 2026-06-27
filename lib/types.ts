@@ -120,6 +120,10 @@ export type ApplicantProfile = {
   intended_major: string | null;
   application_round: "regular" | "early";
   demonstrated_interest: "none" | "light" | "moderate" | "strong" | "unknown" | null;
+  profile_embedding: number[] | null;
+  profile_embedding_model: string | null;
+  provenance: "consented_user" | "curated_public";
+  source_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -133,6 +137,8 @@ export type ApplicationOutcome = {
   outcome: "admitted" | "denied" | "waitlisted" | "deferred";
   application_round: "regular" | "early";
   cycle_year: number;
+  provenance: "consented_user" | "curated_public";
+  source_url: string | null;
   created_at: string;
 };
 
@@ -230,19 +236,37 @@ export type Database = {
       };
       applicant_profiles: {
         Row: ApplicantProfile;
-        Insert: Omit<ApplicantProfile, "created_at" | "id" | "updated_at"> & {
+        Insert: Omit<
+          ApplicantProfile,
+          | "created_at"
+          | "id"
+          | "updated_at"
+          | "profile_embedding"
+          | "profile_embedding_model"
+          | "provenance"
+          | "source_url"
+        > & {
           id?: string;
           created_at?: string;
           updated_at?: string;
+          profile_embedding?: number[] | string | null;
+          profile_embedding_model?: string | null;
+          provenance?: ApplicantProfile["provenance"];
+          source_url?: string | null;
         };
         Update: Partial<Omit<ApplicantProfile, "id" | "subject_id" | "created_at">>;
         Relationships: [];
       };
       application_outcomes: {
         Row: ApplicationOutcome;
-        Insert: Omit<ApplicationOutcome, "created_at" | "id"> & {
+        Insert: Omit<
+          ApplicationOutcome,
+          "created_at" | "id" | "provenance" | "source_url"
+        > & {
           id?: string;
           created_at?: string;
+          provenance?: ApplicationOutcome["provenance"];
+          source_url?: string | null;
         };
         Update: Partial<Omit<ApplicationOutcome, "id" | "subject_id" | "created_at">>;
         Relationships: [];
@@ -305,6 +329,34 @@ export type Database = {
             similarity: number;
           }
         >;
+      };
+      match_similar_cohort: {
+        Args: {
+          p_profile_embedding: string;
+          p_unitid?: number | null;
+          p_exclude_subject_id?: string | null;
+          p_exclude_cycle_year?: number | null;
+          p_k?: number;
+          p_match_count?: number;
+        };
+        Returns: Array<{
+          unitid: number;
+          school_name: string;
+          cohort_size: number;
+          admitted_count: number;
+          denied_count: number;
+          waitlisted_count: number;
+          deferred_count: number;
+          admit_rate: number;
+          denied_rate: number;
+          waitlisted_rate: number;
+          deferred_rate: number;
+          similarity_min: number | null;
+          similarity_max: number | null;
+          attribute_cards: unknown;
+          admit_insights: unknown;
+          provenance: unknown;
+        }>;
       };
     };
     Enums: Record<string, never>;
