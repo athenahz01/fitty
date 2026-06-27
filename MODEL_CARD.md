@@ -200,6 +200,67 @@ document vault uses the private `admira-document-vault` Supabase Storage bucket;
 storage policies require the first path segment to match `auth.uid()`. API
 writes use service-role routes after validating the signed-in bearer token.
 
+## Phase 6 Narrative & Essay Studio + Major/Career Compass
+
+Phase 6 adds the first Anthropic-backed surface and a major/career explorer, each
+behind its own off-by-default flag (`ADMIRA_NARRATIVE_ENABLED`,
+`ADMIRA_COMPASS_ENABLED`). Two contracts are first-class here.
+
+### No-ghostwriting, voice-preserving feedback
+
+`lib/narrative` gives feedback, diagnostics, and targeted suggestions about the
+student's OWN text. It never writes, drafts, or rewrites an essay, and there is
+no "write my essay" path and no AI-detection-evasion / humanizer feature. The
+guarantees are enforced in three places: (1) `detectGhostwritingRequest` refuses
+write/rewrite inputs and redirects to feedback BEFORE any model call; (2) the
+system prompt (read verbatim by the audit in `lib/narrative/index.ts`) forbids
+drafting/rewriting, requires quoting short snippets of the student's own
+sentences, and preserves their voice; (3) `looksGhostwritten` stops the stream if
+the model output starts to read like a drafted essay.
+
+### Grounding (traceable, not free-floating)
+
+Feedback is grounded in (a) the target school's stated CDS C7 priorities and (b)
+retrieved patterns from a curated essay-craft corpus
+(`pipeline/data/essay_pattern_corpus.json` — qualitative writing principles, no
+real-student PII, no numbers, each row `source_url`-tagged and `curated_public`).
+Retrieval reuses the Xenova embedding stack. The streamed response carries the
+deterministic `grounding` frame first — the C7 priorities and the exemplar
+references (id, theme, source_url) it was grounded in — so the audit can trace
+what every piece of feedback rests on.
+
+### No hallucinated numbers — the LLM never emits figures
+
+The Anthropic call produces qualitative text only; the system prompt forbids any
+numbers. Every figure shown in Narrative or Compass (admit tier/score, major-level
+earnings, career wages) comes from the deterministic data/model layer and is
+injected around the call — in Narrative via the `grounding` frame, in Compass via
+sourced rows and the Phase 1 scorer. LLM prose may be non-deterministic; numbers
+never are.
+
+### Anthropic endpoint safety
+
+`ANTHROPIC_API_KEY` is read server-side only (never shipped to the client
+bundle). `/api/narrative` and `/api/compass` are Zod-validated and rate-limited
+(in-memory per-requester buckets); `/api/narrative` streams (SSE) and never logs
+raw essay text. Essays are ephemeral — there is no essay storage table this phase
+(so no owner-RLS surface to add); the demographic-key guard
+(`assertNoForbiddenDemographicKeys`) runs on the request.
+
+### Compass: real admit odds, sourced earnings, deferred ROI
+
+`lib/compass` is a deterministic assembler. It connects majors → careers → sourced
+earnings and ranks major fit by embedding similarity (keyword fallback). Each
+major's admit odds come from the **Phase 1 scorer** (`buildUsAdmitIntelligence`),
+so the tier/score shown equals `/api/admit-intelligence` for the same
+profile/school. Career/earnings rows are passed through from `compass_majors` /
+`compass_careers` reference tables (public-read RLS, `source_url` required, loaded
+by `npm run ingest:compass` from operator-supplied College Scorecard + O*NET/BLS
+data); a missing figure stays null and is labeled "pending dataset", never
+fabricated. **ROI / net price is a clearly-labeled deferred stub** (`ROI_STUB`,
+no number) — it arrives with the Money module (Phase 4). No essay or cohort data
+is fed back into the admit score (leakage stays off).
+
 ## Intended Use
 
 This model is for decision support and product-contract validation. It can say, in a public-data-prior sense, where a student sits relative to a school's published bands and how much uncertainty remains. It must not be used as an oracle or as a claim that Admira can predict real individual outcomes from public data alone.

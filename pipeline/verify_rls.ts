@@ -300,6 +300,33 @@ async function main() {
       },
     );
 
+    await runCheck(
+      results,
+      "Anonymous cannot insert compass major reference rows",
+      async () => {
+        await expectRejected(anonymousDb, "compass_majors", {
+          major_name: `anon-major-${runId}`,
+          median_earnings_10yr: 100000,
+          source_url: "https://example.com/admira-rls-harness",
+          provenance: "curated_public",
+        });
+      },
+    );
+
+    await runCheck(
+      results,
+      "Anonymous cannot insert compass career reference rows",
+      async () => {
+        await expectRejected(anonymousDb, "compass_careers", {
+          major_name: `anon-major-${runId}`,
+          career_title: "Blocked Career",
+          median_wage_annual: 90000,
+          source_url: "https://example.com/admira-rls-harness",
+          provenance: "curated_public",
+        });
+      },
+    );
+
     await runCheck(results, "Anonymous cannot insert command-center tasks", async () => {
       await expectRejected(anonymousDb, "tasks", {
         subject_id: randomUUID(),

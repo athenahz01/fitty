@@ -1,0 +1,86 @@
+{
+  "version": "phase6_essay_pattern_corpus_2026_06_27",
+  "description": "Curated, qualitative essay-craft PATTERNS used to ground Narrative & Essay Studio feedback (RAG). These are NOT real student essays and contain NO student PII and NO numbers. Each row is a public writing-craft principle distilled from published admissions-writing guidance, tagged provenance 'curated_public' with a source_url. The feedback engine retrieves the closest patterns and references them; it never reproduces or drafts essay prose.",
+  "patterns": [
+    {
+      "id": "specificity-over-summary",
+      "theme": "Specificity over summary",
+      "pattern": "Strong essays show one concrete, sensory moment instead of summarizing a whole activity or trait. Look for a scene the reader can picture; flag paragraphs that only assert qualities ('I am passionate, hardworking') without a grounded moment that demonstrates them.",
+      "applies_to": ["personal_statement", "supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://mitadmissions.org/blogs/entry/how-to-write-a-college-essay/"
+    },
+    {
+      "id": "reflection-not-resume",
+      "theme": "Reflection, not resume",
+      "pattern": "The essay should reveal how the student thinks and what an experience meant, not re-list accomplishments already in the activities section. Flag passages that restate awards or titles; prompt the student to add the 'so what' — what changed in how they see the work.",
+      "applies_to": ["personal_statement"],
+      "provenance": "curated_public",
+      "source_url": "https://admissions.princeton.edu/how-apply/essays-personal-statements"
+    },
+    {
+      "id": "authentic-voice",
+      "theme": "Authentic voice",
+      "pattern": "The most effective essays sound like the student speaking, with their own diction and rhythm, not a thesaurus-polished register. Flag sentences whose vocabulary or tone is sharply inconsistent with the rest of the essay; keep suggestions inside the student's existing voice.",
+      "applies_to": ["personal_statement", "supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://college.harvard.edu/resources/blog/how-write-personal-essay"
+    },
+    {
+      "id": "answer-the-prompt",
+      "theme": "Answer the actual prompt",
+      "pattern": "Supplement essays must directly engage what the school asked (e.g. 'why this program', 'a community you belong to'). Flag supplements that are generic and could be submitted to any school; prompt the student to connect to specifics they actually care about.",
+      "applies_to": ["supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://admissions.yale.edu/advice-on-essays"
+    },
+    {
+      "id": "show-growth-arc",
+      "theme": "Show a growth arc",
+      "pattern": "A clear before/after or change-over-time gives the essay momentum. Flag essays that stay static (one mood, one realization stated up front); prompt for the turn where the student's understanding shifted.",
+      "applies_to": ["personal_statement"],
+      "provenance": "curated_public",
+      "source_url": "https://www.commonapp.org/blog/writing-college-essay"
+    },
+    {
+      "id": "concrete-opening",
+      "theme": "Earn the opening line",
+      "pattern": "Strong openings drop the reader into a specific moment rather than a broad abstraction ('Ever since I was young...'). Flag generic or cliche openers; suggest starting from a concrete detail already present later in the student's draft.",
+      "applies_to": ["personal_statement", "supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://mitadmissions.org/blogs/entry/how-to-write-a-college-essay/"
+    },
+    {
+      "id": "activity-action-impact",
+      "theme": "Activity entries: action + impact",
+      "pattern": "A strong 150-character activity entry leads with a vivid verb and names a concrete responsibility and its effect, trimming filler words and articles. Flag entries that only name a title or use vague verbs like 'helped' or 'participated'; suggest a stronger verb and the measurable-but-self-reported impact the student already mentioned.",
+      "applies_to": ["activity_list"],
+      "provenance": "curated_public",
+      "source_url": "https://www.commonapp.org/blog/how-fill-out-activities-section-common-app"
+    },
+    {
+      "id": "coherence-across-application",
+      "theme": "Cross-application coherence",
+      "pattern": "The essays and activities should reinforce a coherent picture, not contradict each other or repeat the same anecdote. Flag when the same story carries multiple essays, or when a claimed central interest never appears elsewhere in the application.",
+      "applies_to": ["personal_statement", "supplement", "activity_list"],
+      "provenance": "curated_public",
+      "source_url": "https://admissions.princeton.edu/how-apply/essays-personal-statements"
+    },
+    {
+      "id": "concrete-why-program",
+      "theme": "Concrete 'why us'",
+      "pattern": "Effective program supplements cite specific courses, labs, traditions, or opportunities and tie them to the student's stated goals. Flag praise that is interchangeable across schools ('great reputation', 'beautiful campus'); prompt the student toward specifics that match what the school states it values.",
+      "applies_to": ["supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://admissions.yale.edu/advice-on-essays"
+    },
+    {
+      "id": "trim-throat-clearing",
+      "theme": "Trim throat-clearing",
+      "pattern": "Early drafts often open with throat-clearing context before the real story begins. Flag long setup paragraphs that delay the first concrete moment; suggest cutting toward the line where the student's actual story starts.",
+      "applies_to": ["personal_statement", "supplement"],
+      "provenance": "curated_public",
+      "source_url": "https://college.harvard.edu/resources/blog/how-write-personal-essay"
+    }
+  ]
+}

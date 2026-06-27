@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "version": "phase6_compass_seed_2026_06_27",
+    "status": "awaiting_dataset",
+    "note": "Major/Career Compass earnings data is provided by the operator (College Scorecard field-of-study earnings + an O*NET/BLS-style career dataset). No salaries are fabricated. Populate `majors` and `careers` below with real rows, each carrying a verifiable source_url, then run `npm run ingest:compass`. Until then the Compass shows majors/careers as available and labels earnings as 'pending dataset', never a made-up number.",
+    "format": {
+      "majors": "[{ major_name, scorecard_field?, median_earnings_10yr|null, source_url (https), provenance: 'curated_public' }]",
+      "careers": "[{ major_name, career_title, onet_code?, median_wage_annual|null, source_url (https), provenance: 'curated_public' }]"
+    }
+  },
+  "majors": [],
+  "careers": []
+}

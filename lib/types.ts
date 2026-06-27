@@ -215,9 +215,48 @@ export type DataAccessLog = {
   created_at: string;
 };
 
+export type CompassMajorRow = {
+  id: string;
+  major_name: string;
+  scorecard_field: string | null;
+  median_earnings_10yr: number | null;
+  source_url: string;
+  provenance: string;
+  ingested_at: string;
+};
+
+export type CompassCareerRow = {
+  id: string;
+  major_name: string;
+  career_title: string;
+  onet_code: string | null;
+  median_wage_annual: number | null;
+  source_url: string;
+  provenance: string;
+  ingested_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
+      compass_majors: {
+        Row: CompassMajorRow;
+        Insert: Omit<CompassMajorRow, "id" | "ingested_at"> & {
+          id?: string;
+          ingested_at?: string;
+        };
+        Update: Partial<Omit<CompassMajorRow, "id">>;
+        Relationships: [];
+      };
+      compass_careers: {
+        Row: CompassCareerRow;
+        Insert: Omit<CompassCareerRow, "id" | "ingested_at"> & {
+          id?: string;
+          ingested_at?: string;
+        };
+        Update: Partial<Omit<CompassCareerRow, "id">>;
+        Relationships: [];
+      };
       schools: {
         Row: School;
         Insert: Omit<
