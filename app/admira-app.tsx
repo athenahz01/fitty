@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -34,33 +35,21 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
 import { searchLocalSchoolFixtures } from "@/lib/school-fixtures";
 import { searchSchools, type SchoolSearchResult } from "@/lib/school-search";
 
+import type { ApplicationRound, Profile } from "./admira-profile";
+import { useAdmiraProfile } from "./admira-profile";
 import { OutcomeDataControlsPanel } from "./outcome-data-controls";
 import { OutcomeCapturePanel } from "./outcome-capture-panel";
 import { OutcomeSessionProvider } from "./outcome-session";
 
-type ApplicationRound = "regular" | "early";
 type BandLabel = "reach" | "target" | "likely";
 type AdmitTier = "Reach" | "Target" | "Likely" | "Safety";
-
-type Profile = {
-  gpa: string;
-  canadianAverage: string;
-  sat: string;
-  act: string;
-  notSubmittingTests: boolean;
-  intendedMajor: string;
-  applicationRound: ApplicationRound;
-  homeState: string;
-  activityNote: string;
-  completedPrerequisites: string;
-};
 
 type SchoolSearchRow = SchoolSearchResult;
 
@@ -469,18 +458,83 @@ type ClimbStatus = "checking" | "enabled" | "disabled";
 type CommandCenterStatus = "checking" | "enabled" | "disabled";
 type CopilotStatus = "checking" | "enabled" | "disabled";
 type ReportsStatus = "checking" | "enabled" | "disabled";
+type NarrativeStatus = "checking" | "enabled" | "disabled";
+type CompassStatus = "checking" | "enabled" | "disabled";
+export type AdmiraView =
+  | "dashboard"
+  | "start"
+  | "schools"
+  | "list"
+  | "students-like-you"
+  | "climb"
+  | "command-center"
+  | "reports"
+  | "money";
 
-const initialProfile: Profile = {
-  gpa: "3.85",
-  canadianAverage: "92",
-  sat: "1480",
-  act: "",
-  notSubmittingTests: false,
-  intendedMajor: "Undecided",
-  applicationRound: "regular",
-  homeState: "NY",
-  activityNote: "",
-  completedPrerequisites: "ENG4U, MHF4U, MCV4U",
+const viewMeta: Record<AdmiraView, { label: string; kicker: string; title: string; intro: string }> = {
+  dashboard: {
+    label: "Dashboard",
+    kicker: "Signed-in home",
+    title: "Your admissions cockpit.",
+    intro:
+      "A confident view of the schools, list moves, and next application actions powered by one shared profile.",
+  },
+  start: {
+    label: "Profile Studio",
+    kicker: "Onboarding",
+    title: "Set the profile once.",
+    intro:
+      "These academic inputs become the shared read across schools, list building, Climb, Command Center, and Copilot.",
+  },
+  schools: {
+    label: "School Universe",
+    kicker: "Explore",
+    title: "Find schools and open the read.",
+    intro:
+      "Search the public school set, add reads, and keep fit evidence separate from admission odds.",
+  },
+  list: {
+    label: "Smart List",
+    kicker: "Build",
+    title: "Balance the school list.",
+    intro:
+      "The list builder keeps reach, target, and likely structure tied to the same profile inputs.",
+  },
+  "students-like-you": {
+    label: "Students Like You",
+    kicker: "Cohorts",
+    title: "See similar outcomes only when k-safe.",
+    intro:
+      "Outcome context appears only when the cohort is large enough to protect privacy.",
+  },
+  climb: {
+    label: "Climb Roadmap",
+    kicker: "Improve",
+    title: "Rank the next credible move.",
+    intro:
+      "Numeric deltas come from rescoring or published spreads; unseen factors stay direction-only.",
+  },
+  "command-center": {
+    label: "Command Center",
+    kicker: "Execute",
+    title: "Turn the list into tasks.",
+    intro:
+      "Requirements, deadlines, and documents stay organized around the schools already on your list.",
+  },
+  reports: {
+    label: "Reports",
+    kicker: "Package",
+    title: "Generate the shareable plan.",
+    intro:
+      "Reports assemble module outputs and sources without inventing new numbers.",
+  },
+  money: {
+    label: "Money",
+    kicker: "Soon",
+    title: "Money intelligence is deferred.",
+    intro:
+      "Net price, merit, and ROI stay labeled as coming soon until the data layer is ready.",
+  },
 };
 
 const initialFitPreferences: FitPreferences = {
@@ -498,6 +552,7 @@ const initialFitPreferences: FitPreferences = {
 const labelOrder: BandLabel[] = ["reach", "target", "likely"];
 const useLocalSchoolFixture =
   process.env.NEXT_PUBLIC_ADMIRA_USE_LOCAL_SCHOOL_FIXTURE === "true";
+const addedSchoolsStorageKey = "admira-added-schools";
 
 function numberOrUndefined(value: string) {
   if (value.trim() === "") {
@@ -510,6 +565,10 @@ function numberOrUndefined(value: string) {
 
 function formatChanceRange(low: number, high: number) {
   return `${Math.round(low * 100)}-${Math.round(high * 100)}%`;
+}
+
+function formatBandLabel(label: BandLabel) {
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatPercentPrecise(value: number) {
@@ -1064,9 +1123,10 @@ function useTheme() {
   return { theme, toggleTheme };
 }
 
-export function AdmiraApp() {
+export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
   const { theme, toggleTheme } = useTheme();
-  const [profile, setProfile] = useState<Profile>(initialProfile);
+  const pathname = usePathname();
+  const { profile, setProfile } = useAdmiraProfile();
   const [schoolQuery, setSchoolQuery] = useState("");
   const [schoolResults, setSchoolResults] = useState<SchoolSearchRow[]>([]);
   const [schoolSearchStatus, setSchoolSearchStatus] = useState<
@@ -1088,9 +1148,14 @@ export function AdmiraApp() {
     useState<CopilotStatus>("checking");
   const [reportsStatus, setReportsStatus] =
     useState<ReportsStatus>("checking");
+  const [narrativeStatus, setNarrativeStatus] =
+    useState<NarrativeStatus>("checking");
+  const [compassStatus, setCompassStatus] =
+    useState<CompassStatus>("checking");
   const [listBuilderStatus, setListBuilderStatus] = useState<
     "checking" | "enabled" | "disabled"
   >("checking");
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const searchRequest = useRef(0);
 
   const profileErrors = useMemo(() => validateProfile(profile), [profile]);
@@ -1099,8 +1164,30 @@ export function AdmiraApp() {
     (!numberOrUndefined(profile.sat) && !numberOrUndefined(profile.act));
 
   useEffect(() => {
-    trackEvent("page_view", { path: "/" });
+    trackEvent("page_view", { path: pathname ?? `/${view}` });
+  }, [pathname, view]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(addedSchoolsStorageKey);
+      if (!stored) {
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setAddedSchools(parsed as AddedSchool[]);
+      }
+    } catch {
+      window.localStorage.removeItem(addedSchoolsStorageKey);
+    }
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      addedSchoolsStorageKey,
+      JSON.stringify(addedSchools),
+    );
+  }, [addedSchools]);
 
   useEffect(() => {
     let active = true;
@@ -1216,6 +1303,36 @@ export function AdmiraApp() {
       }
     }
 
+    async function loadNarrativeStatus() {
+      try {
+        const response = await fetch("/api/narrative/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setNarrativeStatus(payload?.enabled === true ? "enabled" : "disabled");
+      } catch {
+        if (active) {
+          setNarrativeStatus("disabled");
+        }
+      }
+    }
+
+    async function loadCompassStatus() {
+      try {
+        const response = await fetch("/api/compass/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setCompassStatus(payload?.enabled === true ? "enabled" : "disabled");
+      } catch {
+        if (active) {
+          setCompassStatus("disabled");
+        }
+      }
+    }
+
     async function loadListBuilderStatus() {
       try {
         const response = await fetch("/api/list/status");
@@ -1240,6 +1357,8 @@ export function AdmiraApp() {
     void loadCommandCenterStatus();
     void loadCopilotStatus();
     void loadReportsStatus();
+    void loadNarrativeStatus();
+    void loadCompassStatus();
     void loadListBuilderStatus();
 
     return () => {
@@ -1431,127 +1550,96 @@ export function AdmiraApp() {
           : null,
     )
     .filter((label): label is BandLabel => Boolean(label));
+  const meta = viewMeta[view];
+  const readySchools = addedSchools.filter((entry) => entry.status === "ready");
+  const appStatuses = {
+    listBuilder: listBuilderStatus,
+    studentsLikeYou: studentsLikeYouStatus,
+    climb: climbStatus,
+    commandCenter: commandCenterStatus,
+    copilot: copilotStatus,
+    reports: reportsStatus,
+    narrative: narrativeStatus,
+    compass: compassStatus,
+    fitFinder: fitFinderStatus,
+  };
 
   return (
-    <main className="admira-shell">
+    <main className="admira-shell admira-app-shell" data-view={view}>
       <div className="admira-frame">
-        <header className="app-topbar">
-          <div className="brand-mark">
-            <div className="brand-sigil" aria-hidden="true">
-              A
-            </div>
-            <div className="brand-copy">
-              <h1>Admira</h1>
-              <p>honest college chances</p>
-            </div>
-          </div>
-          <div className="topbar-actions">
-            <Link className="method-link" href="/methodology">
-              Methodology
-            </Link>
-            <Link className="method-link" href="/privacy">
-              Privacy
-            </Link>
-            <button
-              className="theme-switch"
-              type="button"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-            >
-              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-              <span className="theme-switch-label">
-                {theme === "light" ? "Dark" : "Light"}
-              </span>
-            </button>
-          </div>
-        </header>
+        <div className="product-shell">
+          <AppSidebar
+            view={view}
+            profile={profile}
+            readiness={profileReadiness(profile)}
+            statuses={appStatuses}
+          />
+          <section className="appmain">
+            <header className="app-topbar">
+              <div className="crumb">
+                <Link href="/dashboard">Admira</Link>
+                <span aria-hidden="true">/</span>
+                <strong>{meta.label}</strong>
+              </div>
+              <div className="topbar-actions">
+                <Link className="method-link" href="/methodology">
+                  Methodology
+                </Link>
+                <Link className="method-link" href="/privacy">
+                  Privacy
+                </Link>
+                {copilotStatus === "enabled" ? (
+                  <button
+                    className="theme-switch"
+                    type="button"
+                    onClick={() => setIsCopilotOpen(true)}
+                  >
+                    <Sparkles size={16} />
+                    <span className="theme-switch-label">Copilot</span>
+                  </button>
+                ) : null}
+                <button
+                  className="theme-switch"
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+                >
+                  {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+                  <span className="theme-switch-label">
+                    {theme === "light" ? "Dark" : "Light"}
+                  </span>
+                </button>
+              </div>
+            </header>
 
-        <div className="workspace-grid">
-          <aside className="planning-column" aria-label="Student profile and school list">
-            <ProfilePanel
-              profile={profile}
-              setProfile={setProfile}
-              errors={profileErrors}
-              notice={formNotice}
-              noAcademicInput={noAcademicInput}
-              admitIntelligenceEnabled={admitIntelligenceStatus === "enabled"}
-              onSave={recalculateAll}
-            />
-            {readyBalanceLabels.length > 0 ? (
-              <BalancePanel labels={readyBalanceLabels} />
-            ) : null}
-          </aside>
-
-          <section className="results-column" aria-label="School chance results">
-            {fitFinderStatus === "enabled" ? (
-              <FitFinderPanel
+            <div className="route-content">
+              <RouteHero meta={meta} view={view} readySchools={readySchools.length} />
+              <RouteBody
+                view={view}
                 profile={profile}
                 setProfile={setProfile}
                 profileErrors={profileErrors}
-                profileReady={hasProfileForFit(profile)}
+                formNotice={formNotice}
+                noAcademicInput={noAcademicInput}
+                admitIntelligenceEnabled={admitIntelligenceStatus === "enabled"}
+                fitFinderStatus={fitFinderStatus}
+                listBuilderStatus={listBuilderStatus}
+                studentsLikeYouStatus={studentsLikeYouStatus}
+                climbStatus={climbStatus}
+                commandCenterStatus={commandCenterStatus}
+                reportsStatus={reportsStatus}
+                schoolQuery={schoolQuery}
+                setSchoolQuery={setSchoolQuery}
+                schoolResults={schoolResults}
+                schoolSearchStatus={schoolSearchStatus}
+                schoolSearchError={schoolSearchError}
+                addedSchools={addedSchools}
+                readyBalanceLabels={readyBalanceLabels}
                 onAddSchool={addSchool}
-                addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+                onRemoveSchool={removeSchool}
+                onRecalculate={recalculateAll}
               />
-            ) : null}
-            {listBuilderStatus === "enabled" ? (
-              <ListBuilderPanel profile={profile} setProfile={setProfile} />
-            ) : null}
-            {studentsLikeYouStatus === "enabled" ? (
-              <StudentsLikeYouPanel profile={profile} />
-            ) : null}
-            {climbStatus === "enabled" ? (
-              <ClimbRoadmapPanel profile={profile} schools={addedSchools} />
-            ) : null}
-            {commandCenterStatus === "enabled" ? (
-              <CommandCenterPanel schools={addedSchools} />
-            ) : null}
-            {copilotStatus === "enabled" ? (
-              <CopilotPanel profile={profile} schools={addedSchools} />
-            ) : null}
-            {reportsStatus === "enabled" ? (
-              <ReportsPanel profile={profile} schools={addedSchools} />
-            ) : null}
-            <SchoolSearchPanel
-              query={schoolQuery}
-              setQuery={setSchoolQuery}
-              results={schoolResults}
-              status={schoolSearchStatus}
-              error={schoolSearchError}
-              onAdd={addSchool}
-              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
-            />
-            {addedSchools.length === 0 ? (
-              <EmptyState onPick={setSchoolQuery} />
-            ) : (
-              <>
-                <div className="results-head">
-                  <div>
-                    <div className="section-kicker">Your schools</div>
-                    <h2 className="section-title">Read the range first.</h2>
-                  </div>
-                  <span className="results-count mono">
-                    {addedSchools.length} added &middot; sorted by odds
-                  </span>
-                </div>
-                {addedSchools.map((entry) => (
-                  <ResultState
-                    key={entry.school.unitid}
-                    entry={entry}
-                    profile={profile}
-                    onRemove={() => removeSchool(entry.school.unitid)}
-                  />
-                ))}
-                <button
-                  className="recalc-button"
-                  type="button"
-                  onClick={recalculateAll}
-                  disabled={addedSchools.some((entry) => entry.status === "loading")}
-                >
-                  <RefreshCw size={16} />
-                  Recalculate list
-                </button>
-              </>
-            )}
+            </div>
           </section>
         </div>
 
@@ -1560,10 +1648,19 @@ export function AdmiraApp() {
           <OutcomeDataControlsPanel />
         </OutcomeSessionProvider>
 
+        {copilotStatus === "enabled" ? (
+          <CopilotDrawer
+            open={isCopilotOpen}
+            profile={profile}
+            schools={addedSchools}
+            onClose={() => setIsCopilotOpen(false)}
+          />
+        ) : null}
+
         <footer className="app-footer">
           <p>
-            Admira is planning support. Ranges are not guarantees, and FIT is
-            not admission chance.
+            Admira leads with a confident read while keeping the range, limits,
+            and methodology close at hand.
           </p>
           <nav className="footer-links" aria-label="Admira policy links">
             <Link className="footer-link" href="/methodology">
@@ -1580,6 +1677,607 @@ export function AdmiraApp() {
       </div>
     </main>
   );
+}
+
+function AppSidebar({
+  view,
+  profile,
+  readiness,
+  statuses,
+}: {
+  view: AdmiraView;
+  profile: Profile;
+  readiness: number;
+  statuses: {
+    listBuilder: "checking" | "enabled" | "disabled";
+    studentsLikeYou: StudentsLikeYouStatus;
+    climb: ClimbStatus;
+    commandCenter: CommandCenterStatus;
+    copilot: CopilotStatus;
+    reports: ReportsStatus;
+    narrative: NarrativeStatus;
+    compass: CompassStatus;
+    fitFinder: FitFinderStatus;
+  };
+}) {
+  return (
+    <aside className="sidebar" aria-label="Admira modules">
+      <Link className="brand-mark sidebar-brand" href="/">
+        <div className="brand-sigil" aria-hidden="true">
+          A
+        </div>
+        <div className="brand-copy">
+          <h1>Admira</h1>
+          <p>honest reads</p>
+        </div>
+      </Link>
+
+      <div className="nav-grp">Overview</div>
+      <NavItem href="/dashboard" active={view === "dashboard"} icon={<BookOpen size={17} />}>
+        Dashboard
+      </NavItem>
+
+      <div className="nav-grp">Build</div>
+      <NavItem href="/start" active={view === "start"} icon={<GraduationCap size={17} />}>
+        Profile Studio
+      </NavItem>
+      <NavItem href="/schools" active={view === "schools"} icon={<Search size={17} />}>
+        School Universe
+      </NavItem>
+      {statuses.listBuilder === "enabled" ? (
+        <NavItem href="/list" active={view === "list"} icon={<SlidersHorizontal size={17} />}>
+          Smart List
+        </NavItem>
+      ) : null}
+
+      <div className="nav-grp">Decide</div>
+      {statuses.studentsLikeYou === "enabled" ? (
+        <NavItem
+          href="/students-like-you"
+          active={view === "students-like-you"}
+          icon={<CircleHelp size={17} />}
+        >
+          Students Like You
+        </NavItem>
+      ) : null}
+      {statuses.climb === "enabled" ? (
+        <NavItem href="/climb" active={view === "climb"} icon={<Target size={17} />}>
+          Climb Roadmap
+        </NavItem>
+      ) : null}
+      {statuses.commandCenter === "enabled" ? (
+        <NavItem
+          href="/command-center"
+          active={view === "command-center"}
+          icon={<ClipboardList size={17} />}
+        >
+          Command Center
+        </NavItem>
+      ) : null}
+
+      <div className="nav-grp">Tell the story</div>
+      {statuses.narrative === "enabled" ? (
+        <NavItem href="/studio" active={false} icon={<FileText size={17} />}>
+          Narrative Studio
+        </NavItem>
+      ) : null}
+      {statuses.compass === "enabled" ? (
+        <NavItem href="/compass" active={false} icon={<Compass size={17} />}>
+          Major Compass
+        </NavItem>
+      ) : null}
+      {statuses.reports === "enabled" ? (
+        <NavItem href="/reports" active={view === "reports"} icon={<Share2 size={17} />}>
+          Reports
+        </NavItem>
+      ) : null}
+      <NavItem href="/money" active={view === "money"} icon={<FileText size={17} />} badge="Soon">
+        Money
+      </NavItem>
+
+      <Link className="profile-chip" href="/start">
+        <div className="profile-avatar-mini" aria-hidden="true">
+          {profile.intendedMajor.trim().charAt(0).toUpperCase() || "A"}
+        </div>
+        <div>
+          <strong>Your profile</strong>
+          <span className="mono">{readiness}% ready</span>
+        </div>
+      </Link>
+    </aside>
+  );
+}
+
+function NavItem({
+  href,
+  active,
+  icon,
+  badge,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  icon: ReactNode;
+  badge?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link className="nav-item" data-active={active ? "true" : undefined} href={href}>
+      {icon}
+      <span>{children}</span>
+      {badge ? <span className="nav-soon">{badge}</span> : null}
+    </Link>
+  );
+}
+
+function RouteHero({
+  meta,
+  view,
+  readySchools,
+}: {
+  meta: (typeof viewMeta)[AdmiraView];
+  view: AdmiraView;
+  readySchools: number;
+}) {
+  return (
+    <section className="route-hero" data-view={view}>
+      <div>
+        <div className="section-kicker">{meta.kicker}</div>
+        <h2 className="route-title">{meta.title}</h2>
+        <p className="helper route-intro">{meta.intro}</p>
+      </div>
+      <div className="route-profile-chip">
+        <span className="micro-label">Ready reads</span>
+        <strong className="mono">{readySchools}</strong>
+      </div>
+    </section>
+  );
+}
+
+function RouteBody({
+  view,
+  profile,
+  setProfile,
+  profileErrors,
+  formNotice,
+  noAcademicInput,
+  admitIntelligenceEnabled,
+  fitFinderStatus,
+  listBuilderStatus,
+  studentsLikeYouStatus,
+  climbStatus,
+  commandCenterStatus,
+  reportsStatus,
+  schoolQuery,
+  setSchoolQuery,
+  schoolResults,
+  schoolSearchStatus,
+  schoolSearchError,
+  addedSchools,
+  readyBalanceLabels,
+  onAddSchool,
+  onRemoveSchool,
+  onRecalculate,
+}: {
+  view: AdmiraView;
+  profile: Profile;
+  setProfile: Dispatch<SetStateAction<Profile>>;
+  profileErrors: string[];
+  formNotice: string;
+  noAcademicInput: boolean;
+  admitIntelligenceEnabled: boolean;
+  fitFinderStatus: FitFinderStatus;
+  listBuilderStatus: "checking" | "enabled" | "disabled";
+  studentsLikeYouStatus: StudentsLikeYouStatus;
+  climbStatus: ClimbStatus;
+  commandCenterStatus: CommandCenterStatus;
+  reportsStatus: ReportsStatus;
+  schoolQuery: string;
+  setSchoolQuery: Dispatch<SetStateAction<string>>;
+  schoolResults: SchoolSearchRow[];
+  schoolSearchStatus: "idle" | "loading" | "ready" | "error";
+  schoolSearchError: string;
+  addedSchools: AddedSchool[];
+  readyBalanceLabels: BandLabel[];
+  onAddSchool: (school: SchoolSearchRow) => void;
+  onRemoveSchool: (unitid: number) => void;
+  onRecalculate: () => void;
+}) {
+  if (view === "start") {
+    return (
+      <div className="route-grid">
+        <ProfilePanel
+          profile={profile}
+          setProfile={setProfile}
+          errors={profileErrors}
+          notice={formNotice}
+          noAcademicInput={noAcademicInput}
+          admitIntelligenceEnabled={admitIntelligenceEnabled}
+          onSave={onRecalculate}
+        />
+        <ProfileGateCard />
+      </div>
+    );
+  }
+
+  if (view === "dashboard") {
+    return (
+      <DashboardHome
+        profile={profile}
+        addedSchools={addedSchools}
+        balanceLabels={readyBalanceLabels}
+        statuses={{
+          listBuilder: listBuilderStatus,
+          studentsLikeYou: studentsLikeYouStatus,
+          climb: climbStatus,
+          commandCenter: commandCenterStatus,
+          reports: reportsStatus,
+        }}
+      />
+    );
+  }
+
+  if (view === "schools") {
+    return (
+      <div className="route-grid schools-route-grid">
+        <ProfilePanel
+          profile={profile}
+          setProfile={setProfile}
+          errors={profileErrors}
+          notice={formNotice}
+          noAcademicInput={noAcademicInput}
+          admitIntelligenceEnabled={admitIntelligenceEnabled}
+          onSave={onRecalculate}
+        />
+        <div className="route-stack">
+          {fitFinderStatus === "enabled" ? (
+            <FitFinderPanel
+              profile={profile}
+              setProfile={setProfile}
+              profileErrors={profileErrors}
+              profileReady={hasProfileForFit(profile)}
+              onAddSchool={onAddSchool}
+              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+            />
+          ) : null}
+          <SchoolSearchPanel
+            query={schoolQuery}
+            setQuery={setSchoolQuery}
+            results={schoolResults}
+            status={schoolSearchStatus}
+            error={schoolSearchError}
+            onAdd={onAddSchool}
+            addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+          />
+          <SchoolReadsSection
+            addedSchools={addedSchools}
+            profile={profile}
+            onRemoveSchool={onRemoveSchool}
+            onRecalculate={onRecalculate}
+            onPick={setSchoolQuery}
+          />
+          {readyBalanceLabels.length > 0 ? (
+            <BalancePanel labels={readyBalanceLabels} />
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "list") {
+    return listBuilderStatus === "enabled" ? (
+      <ListBuilderPanel profile={profile} setProfile={setProfile} />
+    ) : (
+      <FeatureUnavailable label="Smart List Builder" />
+    );
+  }
+
+  if (view === "students-like-you") {
+    return studentsLikeYouStatus === "enabled" ? (
+      <StudentsLikeYouPanel profile={profile} />
+    ) : (
+      <FeatureUnavailable label="Students-Like-You" />
+    );
+  }
+
+  if (view === "climb") {
+    return climbStatus === "enabled" ? (
+      <ClimbRoadmapPanel profile={profile} schools={addedSchools} />
+    ) : (
+      <FeatureUnavailable label="Climb Roadmap" />
+    );
+  }
+
+  if (view === "command-center") {
+    return commandCenterStatus === "enabled" ? (
+      <CommandCenterPanel schools={addedSchools} />
+    ) : (
+      <FeatureUnavailable label="Command Center" />
+    );
+  }
+
+  if (view === "reports") {
+    return reportsStatus === "enabled" ? (
+      <ReportsPanel profile={profile} schools={addedSchools} />
+    ) : (
+      <FeatureUnavailable label="Reports" />
+    );
+  }
+
+  return <MoneyComingSoon />;
+}
+
+function ProfileGateCard() {
+  return (
+    <section className="route-card profile-gate-card">
+      <div className="section-kicker">Shared profile state</div>
+      <h3 className="section-title">One profile, every route.</h3>
+      <p className="helper">
+        Admira stores these inputs in the route-level profile context. School
+        reads, Smart List, Climb, Reports, and Copilot all read the same profile
+        without asking the student to re-enter it.
+      </p>
+      <div className="phase5-empty">
+        <Check size={18} aria-hidden="true" />
+        <span>Owner-RLS remains the persistence path for signed-in profile data.</span>
+      </div>
+    </section>
+  );
+}
+
+function DashboardHome({
+  profile,
+  addedSchools,
+  balanceLabels,
+  statuses,
+}: {
+  profile: Profile;
+  addedSchools: AddedSchool[];
+  balanceLabels: BandLabel[];
+  statuses: {
+    listBuilder: "checking" | "enabled" | "disabled";
+    studentsLikeYou: StudentsLikeYouStatus;
+    climb: ClimbStatus;
+    commandCenter: CommandCenterStatus;
+    reports: ReportsStatus;
+  };
+}) {
+  const primary = addedSchools.find((entry) => entry.status === "ready") ?? null;
+
+  return (
+    <div className="dashboard-grid">
+      <section className="split-verdict-card">
+        <div className="verdict-rail">
+          <span className="section-kicker">Top read</span>
+          {primary ? (
+            <>
+              <h3>{schoolVerdictLine(primary)}</h3>
+              <p>{primary.school.name}</p>
+              <strong className="mono">{schoolVerdictMetric(primary)}</strong>
+            </>
+          ) : (
+            <>
+              <h3>Add a school to see the verdict.</h3>
+              <p>Use School Universe to generate the first range from the same profile.</p>
+              <Link className="add-button split-cta" href="/schools">
+                Browse schools
+              </Link>
+            </>
+          )}
+        </div>
+        <div className="verdict-data-surface">
+          <div className="section-kicker">Profile spine</div>
+          <h3 className="section-title">{profile.intendedMajor || "Major undecided"}</h3>
+          <ul className="profile-chip-row" aria-label="Current shared profile">
+            {profileSummaryItems(profile).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          {balanceLabels.length > 0 ? (
+            <BalancePanel labels={balanceLabels} />
+          ) : (
+            <p className="helper">
+              List balance appears after at least one school has a completed read.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <DashboardLinkCard
+        href="/list"
+        eyebrow="Build"
+        title="Smart List"
+        enabled={statuses.listBuilder === "enabled"}
+      />
+      <DashboardLinkCard
+        href="/students-like-you"
+        eyebrow="Decide"
+        title="Students Like You"
+        enabled={statuses.studentsLikeYou === "enabled"}
+      />
+      <DashboardLinkCard
+        href="/climb"
+        eyebrow="Improve"
+        title="Climb Roadmap"
+        enabled={statuses.climb === "enabled"}
+      />
+      <DashboardLinkCard
+        href="/command-center"
+        eyebrow="Execute"
+        title="Command Center"
+        enabled={statuses.commandCenter === "enabled"}
+      />
+      <DashboardLinkCard
+        href="/reports"
+        eyebrow="Package"
+        title="Reports"
+        enabled={statuses.reports === "enabled"}
+      />
+    </div>
+  );
+}
+
+function DashboardLinkCard({
+  href,
+  eyebrow,
+  title,
+  enabled,
+}: {
+  href: string;
+  eyebrow: string;
+  title: string;
+  enabled: boolean;
+}) {
+  return (
+    <Link
+      className="route-card dashboard-link-card"
+      href={enabled ? href : "/dashboard"}
+      aria-disabled={!enabled}
+    >
+      <span className="section-kicker">{eyebrow}</span>
+      <strong>{title}</strong>
+      <span className="helper">
+        {enabled ? "Open module" : "Hidden until its feature flag is enabled."}
+      </span>
+    </Link>
+  );
+}
+
+function SchoolReadsSection({
+  addedSchools,
+  profile,
+  onRemoveSchool,
+  onRecalculate,
+  onPick,
+}: {
+  addedSchools: AddedSchool[];
+  profile: Profile;
+  onRemoveSchool: (unitid: number) => void;
+  onRecalculate: () => void;
+  onPick: Dispatch<SetStateAction<string>>;
+}) {
+  if (addedSchools.length === 0) {
+    return <EmptyState onPick={onPick} />;
+  }
+
+  return (
+    <>
+      <div className="results-head">
+        <div>
+          <div className="section-kicker">Your schools</div>
+          <h2 className="section-title">Confident verdicts, honest ranges.</h2>
+        </div>
+        <span className="results-count mono">
+          {addedSchools.length} added &middot; sorted by odds
+        </span>
+      </div>
+      {addedSchools.map((entry) => (
+        <ResultState
+          key={entry.school.unitid}
+          entry={entry}
+          profile={profile}
+          onRemove={() => onRemoveSchool(entry.school.unitid)}
+        />
+      ))}
+      <button
+        className="recalc-button"
+        type="button"
+        onClick={onRecalculate}
+        disabled={addedSchools.some((entry) => entry.status === "loading")}
+      >
+        <RefreshCw size={16} />
+        Recalculate list
+      </button>
+    </>
+  );
+}
+
+function FeatureUnavailable({ label }: { label: string }) {
+  return (
+    <section className="route-card" data-testid="route-disabled">
+      <div className="section-kicker">Feature flag off</div>
+      <h3 className="section-title">{label} is not currently open.</h3>
+      <p className="helper">
+        This route is wired, but the module remains gated until its server
+        status endpoint reports enabled.
+      </p>
+      <Link className="add-button route-card-action" href="/dashboard">
+        Return to dashboard
+      </Link>
+    </section>
+  );
+}
+
+function MoneyComingSoon() {
+  return (
+    <section className="route-card money-stub" data-testid="money-stub">
+      <div className="section-kicker">Money module</div>
+      <h3 className="section-title">Coming soon: net price, merit, and ROI.</h3>
+      <p className="helper">
+        Admira is not predicting money yet. This page stays as a labeled stub
+        until the data and model pass audit.
+      </p>
+      <div className="phase5-empty">
+        <CircleHelp size={18} aria-hidden="true" />
+        <span>No cost, scholarship, or ROI numbers are shown here.</span>
+      </div>
+    </section>
+  );
+}
+
+function CopilotDrawer({
+  open,
+  profile,
+  schools,
+  onClose,
+}: {
+  open: boolean;
+  profile: Profile;
+  schools: AddedSchool[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="copilot-layer" data-open={open ? "true" : undefined}>
+      <button
+        className="copilot-scrim"
+        type="button"
+        aria-label="Close Copilot"
+        onClick={onClose}
+      />
+      <aside className="copilot-drawer" aria-hidden={!open}>
+        <div className="copilot-drawer-head">
+          <div>
+            <div className="section-kicker">Persistent Copilot</div>
+            <h3 className="section-title">Tool-grounded planning.</h3>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <CopilotPanel profile={profile} schools={schools} />
+      </aside>
+    </div>
+  );
+}
+
+function schoolVerdictLine(entry: AddedSchool) {
+  if (entry.intelligence) {
+    return `${entry.intelligence.tier}. Lead with the read.`;
+  }
+  if (entry.result) {
+    return `${formatBandLabel(entry.result.band.label)}. Range first under the hood.`;
+  }
+  return "Read pending.";
+}
+
+function schoolVerdictMetric(entry: AddedSchool) {
+  if (entry.intelligence) {
+    return `${entry.intelligence.score}/100`;
+  }
+  if (entry.result) {
+    return formatChanceRange(entry.result.probability.low, entry.result.probability.high);
+  }
+  return "Pending";
 }
 
 function profileReadiness(profile: Profile) {

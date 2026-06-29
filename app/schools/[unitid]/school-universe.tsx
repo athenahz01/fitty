@@ -150,7 +150,7 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
   if (status === "disabled") {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="universe-disabled">
-        <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+        <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
           ← Admira
         </Link>
         <p className="mt-8 text-lg">School Universe is not currently open.</p>
@@ -169,7 +169,7 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
   if (status === "error" || !data) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="universe-error">
-        <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+        <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
           ← Admira
         </Link>
         <p className="mt-8 text-lg">{error || "Unable to load this school."}</p>
@@ -186,7 +186,7 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
       className="mx-auto max-w-5xl px-6 py-12 sm:py-16"
       data-testid="school-universe"
     >
-      <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+      <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
         ← Admira
       </Link>
 

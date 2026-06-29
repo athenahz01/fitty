@@ -20,6 +20,7 @@ function sliceBetween(source: string, start: string, end: string) {
 describe("polish pass guardrails", () => {
   const css = readWorkspaceFile("app/globals.css");
   const app = readWorkspaceFile("app/admira-app.tsx");
+  const landing = readWorkspaceFile("app/page.tsx");
 
   it("uses shared polish motion without broad transitions", () => {
     expect(css).toContain("--motion-fast");
@@ -66,6 +67,19 @@ describe("polish pass guardrails", () => {
     expect(skeletons).not.toMatch(
       /\b(?:FIT|Score|chance|range|admit|records?|students?|complete)\s+\d|\d+(?:\.\d+)?\s*(?:%|pts|records?|students?|complete)|\$[0-9]/i,
     );
+  });
+
+  it("labels marketing sample figures as illustrative", () => {
+    const sampleCard = sliceBetween(
+      landing,
+      '<aside className="sample-read-card"',
+      "</aside>",
+    );
+
+    expect(sampleCard).toContain("Illustration");
+    expect(sampleCard).toContain("These figures are illustrative only");
+    expect(sampleCard).toMatch(/24-38%/);
+    expect(sampleCard).toMatch(/FIT 71/);
   });
 
   it("keeps server-only secret names out of client surfaces", () => {

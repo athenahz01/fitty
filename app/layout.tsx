@@ -5,6 +5,7 @@ import {
   Space_Mono,
 } from "next/font/google";
 import "./globals.css";
+import { AdmiraProfileProvider } from "./admira-profile";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-display",
@@ -51,7 +52,9 @@ export default function RootLayout({
       className={`${bricolage.variable} ${plusJakarta.variable} ${spaceMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AdmiraProfileProvider>{children}</AdmiraProfileProvider>
+      </body>
     </html>
   );
 }

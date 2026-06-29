@@ -95,7 +95,7 @@ export function CompassExplorer() {
   if (status === "disabled") {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="compass-disabled">
-        <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+        <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
           ← Admira
         </Link>
         <p className="mt-8 text-lg">Major/Career Compass is not currently open.</p>
@@ -105,7 +105,7 @@ export function CompassExplorer() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12 sm:py-16" data-testid="compass-explorer">
-      <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+      <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
         ← Admira
       </Link>
       <header className="mt-6">

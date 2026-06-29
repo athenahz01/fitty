@@ -753,7 +753,7 @@ async function fillFitFinderForm(page: Page) {
 }
 
 async function addMitResult(page: Page) {
-  await page.goto("/");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -770,6 +770,28 @@ async function addMitResult(page: Page) {
   );
   return resultCard;
 }
+
+test("renders the marketing landing and routes into the app shell", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await expect(page).toHaveTitle(/Honest, confident college chances \| Admira/);
+  await expect(
+    page.getByRole("heading", { name: "Honest, confident college chances." }),
+  ).toBeVisible();
+  await expect(page.getByText("Illustration")).toBeVisible();
+  await expect(page.getByText(/These figures are illustrative only/)).toBeVisible();
+
+  await expect(page.getByRole("link", { name: "Get your read" }).first()).toHaveAttribute(
+    "href",
+    "/start",
+  );
+  await page.goto("/start");
+  await expect(page).toHaveURL(/\/start$/);
+  await expect(page.getByRole("heading", { name: "Set the profile once." })).toBeVisible();
+  await expect(page.getByLabel("GPA")).toBeVisible();
+});
 
 test.beforeEach(async ({ page }) => {
   await mockStudentsLikeYouStatus(page, false);
@@ -799,6 +821,26 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("persists the shared profile across app routes", async ({ page }) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+
+  await page.goto("/start");
+  await page.getByLabel("GPA").fill("3.91");
+  await page.getByLabel("SAT").fill("1520");
+  await page.getByLabel("Intended major").fill("Data science");
+  await page.getByRole("button", { name: "Save profile" }).click();
+
+  await page.goto("/dashboard");
+  await expect(page.getByText("Data science").first()).toBeVisible();
+
+  await page.goto("/schools");
+  await expect(page.getByTestId("profile-summary")).toContainText("GPA 3.91");
+  await expect(page.getByTestId("profile-summary")).toContainText("SAT 1520");
+  await expect(page.getByTestId("profile-summary")).toContainText("Data science");
+});
+
 test("keeps outcome capture closed when the server flag is disabled", async ({
   page,
 }) => {
@@ -814,7 +856,7 @@ test("keeps outcome capture closed when the server flag is disabled", async ({
     },
   );
 
-  await page.goto("/");
+  await page.goto("/schools");
 
   await expect(page.getByTestId("outcome-capture-closed")).toContainText(
     "Outcome capture is not currently open",
@@ -844,7 +886,7 @@ test("keeps Fit Finder dark when the server flag is disabled", async ({
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
 
   await expect(page.getByTestId("fit-finder-panel")).toHaveCount(0);
 
@@ -888,7 +930,7 @@ test("keeps admission loading skeleton honest while chance request is pending", 
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -941,19 +983,25 @@ test("keeps Phase 7 empty states usable on a mobile viewport", async ({
   await mockCopilotStatus(page, true);
   await mockReportsStatus(page, true);
 
-  await page.goto("/");
-
+  await page.goto("/climb");
   await expect(page.getByTestId("climb-panel")).toContainText(
     "Add at least one scored school to generate moves.",
   );
+
+  await page.goto("/command-center");
   await expect(page.getByTestId("command-center-panel")).toContainText(
     "Add schools first; requirements are generated from the list.",
   );
-  await expect(page.getByTestId("copilot-panel")).toContainText(
-    "Add a scored school for grounded planning receipts.",
-  );
+
+  await page.goto("/reports");
   await expect(page.getByTestId("reports-panel")).toContainText(
     "Add a scored school before generating a report.",
+  );
+
+  await page.goto("/dashboard");
+  await page.getByRole("button", { exact: true, name: "Copilot" }).click();
+  await expect(page.getByTestId("copilot-panel")).toContainText(
+    "Add a scored school for grounded planning receipts.",
   );
 
   const noHorizontalOverflow = await page.evaluate(
@@ -986,6 +1034,7 @@ test("renders a Reports error state without deferred-money copy", async ({
   });
 
   await addMitResult(page);
+  await page.goto("/reports");
   const panel = page.getByTestId("reports-panel");
   await panel.getByTestId("reports-generate").click();
 
@@ -1115,7 +1164,7 @@ test("renders privacy policy and links it from the consent flow", async ({
   await mockOutcomeStatus(page, true);
   await mockFitStatus(page, false);
   await mockSupabaseAuth(page);
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByRole("link", { name: "Privacy" }).first()).toHaveAttribute(
     "href",
     "/privacy",
@@ -1182,7 +1231,7 @@ test("records consent, profile, and one outcome through the enabled capture flow
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
 
   const captureFlow = await signInOutcomePanel(page);
 
@@ -1309,7 +1358,7 @@ test("exports, revokes, and deletes signed-in outcome data with confirmation", a
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await signInOutcomePanel(page);
 
   const controls = page.getByTestId("outcome-data-controls");
@@ -1384,7 +1433,7 @@ test("runs Fit Finder, renders grounded prose, and adds a school to the list", a
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -1454,7 +1503,7 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -1506,7 +1555,7 @@ test("renders Admit Intelligence for a US school when the flag is enabled", asyn
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await expect(page.getByText("Profile Studio").first()).toBeVisible();
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
@@ -1563,7 +1612,7 @@ test("renders Admit Intelligence for a Canadian program when the flag is enabled
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await expect(page.getByText("Profile Studio").first()).toBeVisible();
   await page.getByLabel("Intended major").fill("Computer Science");
   await page.getByLabel("Canadian average").fill("92");
@@ -1666,9 +1715,7 @@ test("renders Students-Like-You k-safe aggregates when the flag is enabled", asy
     });
   });
 
-  await page.goto("/");
-  const panel = page.getByTestId("sly-panel");
-  await expect(panel).toContainText("Students Like You");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -1676,6 +1723,10 @@ test("renders Students-Like-You k-safe aggregates when the flag is enabled", asy
   await page
     .getByPlaceholder(/Robotics captain/)
     .fill("Robotics captain and research internship.");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await page.goto("/students-like-you");
+  const panel = page.getByTestId("sly-panel");
+  await expect(panel).toContainText("Students Like You");
   await panel.getByTestId("sly-run").click();
 
   await expect(panel.getByTestId("sly-results")).toContainText(
@@ -1717,7 +1768,7 @@ test("renders Students-Like-You sub-k empty state when SQL suppresses the cohort
     });
   });
 
-  await page.goto("/");
+  await page.goto("/students-like-you");
   const panel = page.getByTestId("sly-panel");
   await panel.getByTestId("sly-run").click();
   await expect(panel.getByTestId("sly-empty")).toContainText(
@@ -1813,7 +1864,7 @@ test("renders Climb Roadmap computed deltas when the flag is enabled", async ({
     });
   });
 
-  await page.goto("/");
+  await page.goto("/schools");
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
@@ -1825,6 +1876,7 @@ test("renders Climb Roadmap computed deltas when the flag is enabled", async ({
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
     .click();
 
+  await page.goto("/climb");
   const panel = page.getByTestId("climb-panel");
   await panel.getByTestId("climb-run").click();
   await expect(panel.getByTestId("climb-results")).toContainText("Test score");
@@ -1903,6 +1955,7 @@ test("renders Command Center requirements and deadline-not-loaded state", async 
   });
 
   await addMitResult(page);
+  await page.goto("/command-center");
   const panel = page.getByTestId("command-center-panel");
   await panel.getByTestId("command-center-run").click();
   await expect(panel.getByTestId("command-center-results")).toContainText(
@@ -1985,6 +2038,7 @@ test("streams a mocked Copilot answer with tool receipts and an action receipt",
   });
 
   await addMitResult(page);
+  await page.getByRole("button", { exact: true, name: "Copilot" }).click();
   const panel = page.getByTestId("copilot-panel");
   await expect(panel).toContainText("Admira Copilot");
   await panel.getByTestId("copilot-input").fill("Mark the supplement done.");
@@ -2074,6 +2128,7 @@ test("generates and exports a mocked report without deferred-money fields", asyn
   });
 
   await addMitResult(page);
+  await page.goto("/reports");
   const panel = page.getByTestId("reports-panel");
   await panel.getByTestId("reports-generate").click();
 
@@ -2097,9 +2152,9 @@ test("renders an honest elite-school result and methodology disclosure", async (
 }) => {
   await mockOutcomeStatus(page, false);
   await mockFitStatus(page, false);
-  await page.goto("/");
+  await page.goto("/schools");
 
-  await expect(page).toHaveTitle(/Fit and Honest Chance \| Admira/);
+  await expect(page).toHaveTitle(/School Universe \| Admira/);
   await page.getByLabel("GPA").fill("3.95");
   await page.getByLabel("SAT").fill("1540");
   await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");

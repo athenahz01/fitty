@@ -160,7 +160,7 @@ test("generates a balanced list and re-balances live when a slider moves", async
     });
   });
 
-  await page.goto("/");
+  await page.goto("/list");
 
   const panel = page.getByTestId("list-builder-panel");
   await expect(panel).toBeVisible();
@@ -206,7 +206,10 @@ test("keeps the List Builder dark when the server flag is disabled", async ({
     route.fulfill({ contentType: "application/json", body: JSON.stringify({ enabled: false }) }),
   );
 
-  await page.goto("/");
+  await page.goto("/list");
+  await expect(page.getByTestId("route-disabled")).toContainText(
+    "Smart List Builder is not currently open.",
+  );
   await expect(page.getByTestId("list-builder-panel")).toHaveCount(0);
 });
 

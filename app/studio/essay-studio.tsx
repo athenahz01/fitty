@@ -150,7 +150,7 @@ export function EssayStudio() {
   if (status === "disabled") {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="studio-disabled">
-        <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+        <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
           ← Admira
         </Link>
         <p className="mt-8 text-lg">Narrative &amp; Essay Studio is not currently open.</p>
@@ -160,7 +160,7 @@ export function EssayStudio() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12 sm:py-16" data-testid="essay-studio">
-      <Link href="/" className="text-sm opacity-60 hover:opacity-100">
+      <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
         ← Admira
       </Link>
       <header className="mt-6">
