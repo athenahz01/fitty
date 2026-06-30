@@ -50,6 +50,9 @@ export type CompassCareerView = {
 export type CompassMajorView = {
   major_name: string;
   fit: number | null;
+  // A grounded, NUMBER-FREE reason tying this major to the student's stated
+  // interests and the sourced careers it opens. Pure text — invents no figure.
+  reason: string;
   median_earnings_10yr: SourcedFigure;
   careers: CompassCareerView[];
   roi: typeof ROI_STUB;
@@ -113,6 +116,38 @@ function keywordFit(interests: string | undefined, majorName: string): number | 
   }
   const union = new Set([...interestTokens, ...majorTokens]).size;
   return Math.round((shared / union) * 100);
+}
+
+// Deterministic, grounded reason text. Describes fit qualitatively (no number,
+// which is shown separately) and names a real career the major opens, so each
+// recommendation reads as specific rather than a generic list entry.
+function buildMajorReason(
+  fit: number | null,
+  careerTitles: string[],
+  hasInterests: boolean,
+): string {
+  let fitPhrase: string;
+  if (fit === null) {
+    fitPhrase = hasInterests
+      ? "Fit isn't scored for this major yet"
+      : "Add your interests to see how this major fits you";
+  } else if (fit >= 60) {
+    fitPhrase = "A strong match for the interests you listed";
+  } else if (fit >= 30) {
+    fitPhrase = "A moderate match for the interests you listed";
+  } else if (fit >= 1) {
+    fitPhrase = "A lighter match for the interests you listed";
+  } else {
+    fitPhrase = "Little overlap with the interests you listed";
+  }
+
+  if (careerTitles.length === 0) {
+    return `${fitPhrase}.`;
+  }
+  if (careerTitles.length === 1) {
+    return `${fitPhrase}; it opens into roles like ${careerTitles[0]}.`;
+  }
+  return `${fitPhrase}; it opens into roles like ${careerTitles[0]} and ${careerTitles[1]}.`;
 }
 
 function admitFor(
@@ -200,6 +235,11 @@ export function generateCompass(input: {
       return {
         major_name: major.major_name,
         fit,
+        reason: buildMajorReason(
+          fit,
+          careers.map((career) => career.career_title),
+          Boolean(input.studentInterests && input.studentInterests.trim().length > 0),
+        ),
         median_earnings_10yr: {
           value: major.median_earnings_10yr,
           source_url: major.source_url,

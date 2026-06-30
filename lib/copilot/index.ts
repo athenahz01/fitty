@@ -373,6 +373,138 @@ export function answerFromToolResults(input: {
   return lines.join(" ");
 }
 
+export type CopilotProfileContext = {
+  intended_major?: string;
+  application_round?: "regular" | "early";
+  interests?: string;
+};
+
+// The Copilot system prompt — pure, so the audit and tests can read it verbatim.
+// Encodes the answer contract (specific, grounded, cites modules, one next step)
+// and the hard guards (no numbers, no money, no PII, no "honest"/"confident").
+export function buildCopilotSystemPrompt(): string {
+  return [
+    "You are Admira Copilot, a college-application advisor helping one student plan their applications.",
+    "Write like a sharp, warm human advisor: plain, specific, and useful. Two to four short sentences.",
+    "Use the MODULE FINDINGS provided to answer the student's actual question directly. Name the Admira module each fact came from (Admit Intelligence, Smart List, Students Like You, Climb, Command Center, Major Compass) so the student knows where it is in the app.",
+    "End with one concrete next step the student can take right now.",
+    "Hard rules:",
+    "- Do not restate or rephrase the question, and do not open with filler like 'Great question'. Get straight to the answer.",
+    "- Do not hedge vaguely ('it depends', 'consider various factors'). Be concrete and grounded in the findings.",
+    "- Do not write any numeral, percentage, currency, rank, score, count, or date. The app shows every number separately from server data; you add the qualitative reasoning around it.",
+    "- Do not discuss cost, net price, merit aid, scholarships, tuition, affordability, or ROI.",
+    "- Do not expose private identifiers or raw similar-student rows.",
+    "- Do not use the words 'honest' or 'confident', and avoid chatbot cliches. No em dashes.",
+  ].join("\n");
+}
+
+// The grounded user message: the question, a qualitative profile, and the
+// number-free module findings digest. The model reasons over real data without
+// ever being handed a figure to echo.
+export function buildCopilotUserMessage(input: {
+  message: string;
+  results: CopilotToolResult[];
+  profile?: CopilotProfileContext;
+}): string {
+  const facts = summarizeResultsForModel(input.results);
+  const profileLines: string[] = [];
+  if (input.profile?.intended_major) {
+    profileLines.push(`- Intended major: ${input.profile.intended_major}`);
+  }
+  if (input.profile?.interests) {
+    profileLines.push(`- Interests: ${input.profile.interests}`);
+  }
+  if (input.profile?.application_round) {
+    profileLines.push(`- Application round: ${input.profile.application_round}`);
+  }
+
+  return [
+    `STUDENT QUESTION: ${input.message}`,
+    "",
+    "STUDENT PROFILE:",
+    profileLines.length > 0 ? profileLines.join("\n") : "- (not provided)",
+    "",
+    "MODULE FINDINGS (already computed from the student's real data; use these, never invent figures):",
+    facts.length > 0
+      ? facts.map((fact) => `- ${fact}`).join("\n")
+      : "- (no module results available)",
+    "",
+    "Answer the question using these findings, cite the modules by name, and end with one concrete next step. No numbers.",
+  ].join("\n");
+}
+
+// A qualitative, NUMBER-FREE digest of the tool results, fed to the model so its
+// prose is specific and grounded (school names, tiers, lever labels, module
+// names) without ever handing it a figure to echo. Every number the user sees
+// still comes from the deterministic receipts in `answerFromToolResults`.
+export function summarizeResultsForModel(results: CopilotToolResult[]): string[] {
+  const facts: string[] = [];
+
+  for (const result of results) {
+    if (result.name === "admit_intelligence") {
+      const output = result.output as UsAdmitIntelligence;
+      facts.push(
+        `Admit Intelligence rates your top school a ${output.tier} for your profile.`,
+      );
+    }
+
+    if (result.name === "list_builder") {
+      const output = result.output as GeneratedList;
+      const first = output.list[0];
+      facts.push(
+        first
+          ? `Smart List leads with ${first.name}, a ${first.tier} in your ${first.bucket} bucket.`
+          : "Smart List has no supported schools for this profile yet.",
+      );
+    }
+
+    if (result.name === "students_like_you") {
+      const output = result.output as StudentsLikeYouResponse;
+      const cohort = output.cohorts[0];
+      facts.push(
+        cohort
+          ? `Students Like You found a privacy-safe cohort of similar applicants at ${cohort.school_name}.`
+          : "Students Like You does not have a large-enough cohort to show yet.",
+      );
+    }
+
+    if (result.name === "climb_roadmap") {
+      const output = result.output as ClimbRoadmap;
+      const move = output.ranked_moves[0];
+      facts.push(
+        move
+          ? `Climb's top move is "${move.lever.label}" for ${move.school.name}.`
+          : "Climb found no model-visible move for the loaded schools yet.",
+      );
+    }
+
+    if (result.name === "command_center") {
+      facts.push(
+        "Command Center is tracking the requirements, tasks, and deadlines for your list.",
+      );
+    }
+
+    if (result.name === "major_compass") {
+      const output = result.output as CompassResult;
+      const major = output.majors[0];
+      facts.push(
+        major
+          ? `Major Compass's strongest match for your interests is ${major.major_name}.`
+          : "Major Compass has no major rows loaded yet.",
+      );
+    }
+
+    if (result.name === "update_command_center_status") {
+      const output = result.output as CommandCenterActionReceipt;
+      facts.push(
+        `You just marked "${output.requirement_key}" as ${output.status} in Command Center.`,
+      );
+    }
+  }
+
+  return facts;
+}
+
 export function numericTokensFromText(text: string) {
   return (
     text.match(

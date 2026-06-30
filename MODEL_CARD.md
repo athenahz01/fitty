@@ -216,7 +216,11 @@ write/rewrite inputs and redirects to feedback BEFORE any model call; (2) the
 system prompt (read verbatim by the audit in `lib/narrative/index.ts`) forbids
 drafting/rewriting, requires quoting short snippets of the student's own
 sentences, and preserves their voice; (3) `looksGhostwritten` stops the stream if
-the model output starts to read like a drafted essay.
+the model output starts to read like a drafted essay. The prompt also bans vague
+platitudes ("be more specific", "show don't tell", etc.) unless they quote the
+exact words and name the concrete change, and asks the model to lead with the one
+or two highest-impact changes for that school — sharper feedback on the student's
+own text, never a rewrite of it.
 
 ### Grounding (traceable, not free-floating)
 
@@ -257,9 +261,13 @@ profile/school. Career/earnings rows are passed through from `compass_majors` /
 `compass_careers` reference tables (public-read RLS, `source_url` required, loaded
 by `npm run ingest:compass` from operator-supplied College Scorecard + O*NET/BLS
 data); a missing figure stays null and is labeled "pending dataset", never
-fabricated. **ROI / net price is a clearly-labeled deferred stub** (`ROI_STUB`,
-no number) — it arrives with the Money module (Phase 4). No essay or cohort data
-is fed back into the admit score (leakage stays off).
+fabricated. Each major now carries a deterministic, **number-free `reason`** that
+ties it to the student's stated interests and names a real career it opens, so the
+list reads as specific recommendations rather than a generic catalog; the reason
+is assembled from the same sourced rows and invents no figure. **ROI / net price
+is a clearly-labeled deferred stub** (`ROI_STUB`, no number) — it arrives with the
+Money module (Phase 4). No essay or cohort data is fed back into the admit score
+(leakage stays off).
 
 ## Phase 7 Admira Copilot + Reports
 
@@ -278,7 +286,15 @@ service-role pattern as the Phase 5 command-center routes.
 
 Every number in the Copilot answer is rendered from tool receipts. Optional
 Anthropic prose is qualitative only: the server prompt forbids numerals and the
-stream is sanitized before it reaches the UI. Money planning remains out of scope
+stream is sanitized before it reaches the UI. To make that prose specific rather
+than boilerplate, the model is now fed the student's qualitative profile
+(intended major, round, interests) and a **number-free digest of the actual tool
+findings** (`summarizeResultsForModel` — school names, tiers, lever and module
+names, never a figure) and is instructed to answer the question, cite the module
+each fact came from, and end with a concrete next step. The grounding is richer;
+the guards are unchanged — `sanitizeModelText` still scrubs any numeral and
+`assertChatNumbersCameFromTools` still rejects any figure absent from a tool
+result. Money planning remains out of scope
 for this phase; Copilot does not register a money tool, and report rendering
 omits list-builder net-cost fields plus Compass ROI/earnings fields. Report
 figures are copied from the tool receipts that produced them.

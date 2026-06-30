@@ -1,6 +1,12 @@
 import "server-only";
 
-import { copilotToolRegistry, sanitizeModelText, type CopilotToolResult } from ".";
+import {
+  buildCopilotSystemPrompt,
+  buildCopilotUserMessage,
+  sanitizeModelText,
+  type CopilotProfileContext,
+  type CopilotToolResult,
+} from ".";
 
 const DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -17,41 +23,10 @@ export function copilotModel() {
   return process.env.ANTHROPIC_MODEL || DEFAULT_CLAUDE_MODEL;
 }
 
-export function buildCopilotSystemPrompt() {
-  const tools = copilotToolRegistry
-    .map((tool) => `${tool.name} wraps ${tool.wraps}`)
-    .join("\n");
-
-  return [
-    "You are Admira Copilot. You may add qualitative planning language only.",
-    "Do not write any numeral, percentage, currency, rank, score, count, or date.",
-    "Every number shown to the user is already supplied by server tool receipts.",
-    "Do not discuss cost, net price, merit aid, scholarships, tuition, affordability, or ROI.",
-    "Do not expose private identifiers or raw similar-student rows.",
-    "Registered tools:",
-    tools,
-  ].join("\n");
-}
-
-export function buildCopilotUserMessage(input: {
-  message: string;
-  results: CopilotToolResult[];
-}) {
-  return [
-    `Student question: ${input.message}`,
-    "Tool receipts are available to the server-rendered answer. Do not repeat any number from them.",
-    JSON.stringify(
-      input.results.map((result) => ({
-        name: result.name,
-        received: true,
-      })),
-    ),
-  ].join("\n\n");
-}
-
 export async function* streamCopilotQualitativeText(input: {
   message: string;
   results: CopilotToolResult[];
+  profile?: CopilotProfileContext;
   signal?: AbortSignal;
 }): AsyncGenerator<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -75,7 +50,11 @@ export async function* streamCopilotQualitativeText(input: {
       messages: [
         {
           role: "user",
-          content: buildCopilotUserMessage(input),
+          content: buildCopilotUserMessage({
+            message: input.message,
+            results: input.results,
+            profile: input.profile,
+          }),
         },
       ],
       stream: true,

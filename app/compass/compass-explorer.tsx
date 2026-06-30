@@ -8,6 +8,7 @@ type SourcedFigure = { value: number | null; source_url: string };
 type CompassMajorView = {
   major_name: string;
   fit: number | null;
+  reason: string;
   median_earnings_10yr: SourcedFigure;
   careers: {
     career_title: string;
@@ -224,7 +225,10 @@ export function CompassExplorer() {
                       {major.fit === null ? "fit —" : `fit ${major.fit}`}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm">
+                  <p className="mt-1 text-sm opacity-80" data-testid="compass-reason">
+                    {major.reason}
+                  </p>
+                  <p className="mt-2 text-sm">
                     Median earnings 10yr:{" "}
                     {money(major.median_earnings_10yr.value) ? (
                       <a

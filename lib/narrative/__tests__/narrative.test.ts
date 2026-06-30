@@ -68,6 +68,16 @@ describe("Narrative no-ghostwriting contract", () => {
       ),
     ).toBe(false);
   });
+
+  it("demands specific, quote-anchored feedback and bans vague platitudes", () => {
+    const system = buildSystemPrompt().toLowerCase();
+    // Each suggestion must quote the student's own words and tie to a priority.
+    expect(system).toContain("quote a short snippet of the student's actual words");
+    expect(system).toContain("banned vague advice");
+    expect(system).toContain("show don't tell");
+    // The model is explicitly told not to use the banned voice words in output.
+    expect(system).toContain("do not use the words 'honest' or 'confident'");
+  });
 });
 
 describe("Narrative grounding is traceable", () => {

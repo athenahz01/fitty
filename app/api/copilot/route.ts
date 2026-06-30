@@ -328,6 +328,11 @@ export async function POST(request: Request) {
           for await (const text of streamCopilotQualitativeText({
             message: parsed.data.message,
             results,
+            profile: {
+              intended_major: parsed.data.profile?.intended_major,
+              application_round: parsed.data.profile?.application_round,
+              interests: parsed.data.interests,
+            },
           })) {
             controller.enqueue(encoder.encode(sseFrame("delta", { text })));
           }

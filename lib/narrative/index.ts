@@ -173,7 +173,10 @@ export function buildSystemPrompt(): string {
     "4. Do NOT include any numbers or figures (no admit rates, scores, percentages, salaries, counts, or years). Speak only qualitatively. Numeric context is shown to the student separately by the app.",
     "5. Ground your feedback in the provided school priorities and the provided essay-craft patterns. Do not use outside facts, rankings, or statistics.",
     "6. If the request is to write or rewrite the essay, refuse and redirect to feedback on their existing draft. Never provide an AI-detection-evasion or 'humanizer' transformation.",
-    "Organize feedback as: Strengths; Gaps versus this school's stated priorities; Specific suggestions (each quoting a short snippet of the student's own text); and a coherence note. For an activity list, give entry-by-entry feedback on verbs and impact. Keep it concise and specific. Do not use em dashes.",
+    "BE SPECIFIC, NOT GENERIC. Every suggestion must (a) quote a short snippet of the student's actual words, (b) name which of this school's stated priorities or which provided craft pattern it serves, and (c) give one concrete direction the student can act on themselves.",
+    "Banned vague advice: never say 'be more specific', 'add detail', 'make it vivid', 'show don't tell', 'be authentic', or 'add more emotion' without quoting the exact words you mean and saying the concrete change. If a sentence is already strong, say why instead of padding.",
+    "Prioritize: lead with the one or two changes that would most move this essay for this school, not an exhaustive list. Write like a plain, warm, direct advisor, not a chatbot.",
+    "Organize feedback as: Strengths; Gaps versus this school's stated priorities; Specific suggestions (each quoting a short snippet of the student's own text); and a coherence note. For an activity list, give entry-by-entry feedback on verbs and impact. Keep it concise and specific. Do not use em dashes. Do not use the words 'honest' or 'confident'.",
   ].join("\n");
 }
 
@@ -213,7 +216,7 @@ export function buildUserMessage(input: {
     "",
     essaySection,
     "",
-    "Give feedback following your rules. Quote short snippets of the student's own words. Do not write replacement prose. Do not include any numbers.",
+    "Give feedback following your rules. Quote short snippets of the student's own words and tie each suggestion to a specific priority or pattern above. Lead with the one or two changes that would most help this essay for this school. Do not write replacement prose. Do not include any numbers.",
   ].join("\n");
 }
 

@@ -11,10 +11,13 @@ import { studentsLikeYouResponse } from "../../similarity";
 import {
   answerFromToolResults,
   assertChatNumbersCameFromTools,
+  buildCopilotSystemPrompt,
+  buildCopilotUserMessage,
   copilotToolRegistry,
   planCopilotTools,
   runCopilotTool,
   sanitizeModelText,
+  summarizeResultsForModel,
 } from "../index";
 
 const usSchool = {
@@ -255,5 +258,72 @@ describe("copilot number safety", () => {
   it("keeps the Anthropic key server-side", () => {
     const appSource = readFileSync("app/admira-app.tsx", "utf8");
     expect(appSource).not.toContain("ANTHROPIC_API_KEY");
+  });
+});
+
+describe("copilot prompt construction", () => {
+  const admit = runCopilotTool("admit_intelligence", {
+    admit_intelligence: { input: profile, school: usSchool },
+  });
+  const climb = runCopilotTool("climb_roadmap", {
+    climb_roadmap: {
+      profile: {
+        sat_score: profile.sat_score,
+        act_score: profile.act_score,
+        gpa: profile.gpa,
+        application_round: profile.application_round,
+      },
+      schools: [usSchool],
+    },
+  });
+
+  it("builds a number-free, grounded digest naming the modules", () => {
+    const facts = summarizeResultsForModel([admit, climb]);
+    expect(facts.length).toBe(2);
+    expect(facts.join(" ")).toContain("Admit Intelligence");
+    expect(facts.join(" ")).toContain("Climb");
+    // The digest must hand the model qualitative grounding, never a figure.
+    expect(facts.join(" ")).not.toMatch(/\d|\$|%/);
+  });
+
+  it("feeds the model the real profile and tool findings, not just 'received'", () => {
+    const user = buildCopilotUserMessage({
+      message: "Where should I focus to improve my odds?",
+      results: [admit, climb],
+      profile: {
+        intended_major: "Computer science",
+        application_round: "regular",
+        interests: "robotics and embedded systems",
+      },
+    });
+
+    expect(user).toContain("Where should I focus to improve my odds?");
+    expect(user).toContain("Computer science");
+    expect(user).toContain("robotics and embedded systems");
+    expect(user).toContain("Admit Intelligence");
+    expect(user).toContain("Climb");
+    // The old prompt shipped {"received":true}; the new one must not.
+    expect(user).not.toContain("received");
+    // We never hand the model a figure to echo.
+    expect(user).not.toMatch(/\d|\$|%/);
+  });
+
+  it("system prompt demands specificity and keeps every guard", () => {
+    const system = buildCopilotSystemPrompt();
+    expect(system).toContain("one concrete next step");
+    expect(system).toMatch(/Do not restate/i);
+    expect(system).toMatch(/Do not write any numeral/i);
+    expect(system).toMatch(/net price|merit aid|ROI/i);
+    // The model is explicitly told not to use the banned voice words in output.
+    expect(system).toContain("Do not use the words 'honest' or 'confident'");
+  });
+
+  it("still rejects any number the model emits that no tool produced", () => {
+    expect(() =>
+      assertChatNumbersCameFromTools({
+        text: "Your odds are about 73% at this school.",
+        results: [],
+      }),
+    ).toThrow();
   });
 });

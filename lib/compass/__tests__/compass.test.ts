@@ -140,6 +140,30 @@ describe("Compass assembler", () => {
     expect(() => assertCareerLineage(majors)).not.toThrow();
   });
 
+  it("gives each major a grounded, number-free reason tied to interests and careers", () => {
+    const compass = generateCompass({
+      majors,
+      careers,
+      studentInterests: "computer science and software",
+    });
+    const cs = compass.majors.find((m) => m.major_name === "Computer Science");
+    const history = compass.majors.find((m) => m.major_name === "History");
+
+    // Specific, not a generic list: names the real career the major opens.
+    expect(cs?.reason).toContain("Software Developer");
+    expect(cs?.reason.toLowerCase()).toContain("match for the interests you listed");
+    // Reasons are qualitative only — no fabricated figure leaks into the text.
+    expect(cs?.reason).not.toMatch(/\d|\$|%/);
+    expect(history?.reason).not.toMatch(/\d|\$|%/);
+
+    // With no interests supplied, the reason invites the student to add them.
+    const noInterests = generateCompass({ majors, careers });
+    const csNoInterest = noInterests.majors.find(
+      (m) => m.major_name === "Computer Science",
+    );
+    expect(csNoInterest?.reason.toLowerCase()).toContain("add your interests");
+  });
+
   it("ranks majors by embedding similarity when supplied, else keyword overlap", () => {
     const bySimilarity = generateCompass({
       majors,
