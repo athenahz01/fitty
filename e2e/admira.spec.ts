@@ -742,7 +742,7 @@ async function fillFitFinderForm(page: Page) {
     .getByRole("button", { name: "Northeast" })
     .click();
   await finder.getByLabel("Published cost ceiling").fill("30000");
-  await finder.getByLabel("Learning notes").fill("project labs");
+  await finder.getByLabel("How you like to learn").fill("project labs");
   await finder.getByRole("button", { name: "Find schools" }).click();
   // Results render as a collapsed ranked list; expand the school to reveal the
   // detailed card (radar, range, levers).
@@ -752,13 +752,43 @@ async function fillFitFinderForm(page: Page) {
   return finder;
 }
 
-async function addMitResult(page: Page) {
-  await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Intended major").fill("Computer science");
+type ProfileFields = {
+  gpa?: string;
+  sat?: string;
+  act?: string;
+  major?: string;
+  canadianAverage?: string;
+  prerequisites?: string;
+  activities?: string;
+};
+
+// The profile form lives only on /start. Fill it there, save (which routes to
+// /dashboard once valid), and let the shared profile flow into every other route.
+async function setProfileOnStart(page: Page, fields: ProfileFields) {
+  await page.goto("/start");
+  if (fields.gpa) await page.getByLabel("GPA").fill(fields.gpa);
+  if (fields.canadianAverage)
+    await page.getByLabel("Canadian average").fill(fields.canadianAverage);
+  if (fields.prerequisites)
+    await page.getByLabel("Completed prerequisites").fill(fields.prerequisites);
+  if (fields.sat) await page.getByLabel("SAT").fill(fields.sat);
+  if (fields.act)
+    await page.getByRole("textbox", { exact: true, name: "ACT" }).fill(fields.act);
+  if (fields.major) await page.getByLabel("Intended major").fill(fields.major);
+  if (fields.activities)
+    await page.getByLabel("Activities and context").fill(fields.activities);
   await page.getByRole("button", { name: "Save profile" }).click();
+  await page.waitForURL(/\/dashboard$/);
+}
+
+async function addMitResult(page: Page) {
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+  });
+  await page.goto("/schools");
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
@@ -776,9 +806,11 @@ test("renders the marketing landing and routes into the app shell", async ({
 }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle(/Honest, confident college chances \| Admira/);
+  await expect(page).toHaveTitle(
+    /Your College Chances, School by School \| Admira/,
+  );
   await expect(
-    page.getByRole("heading", { name: "Honest, confident college chances." }),
+    page.getByRole("heading", { name: "Know your chances at every college." }),
   ).toBeVisible();
   await expect(page.getByText("Illustration")).toBeVisible();
   await expect(page.getByText(/These figures are illustrative only/)).toBeVisible();
@@ -789,7 +821,7 @@ test("renders the marketing landing and routes into the app shell", async ({
   );
   await page.goto("/start");
   await expect(page).toHaveURL(/\/start$/);
-  await expect(page.getByRole("heading", { name: "Set the profile once." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Build your profile." })).toBeVisible();
   await expect(page.getByLabel("GPA")).toBeVisible();
 });
 
@@ -826,19 +858,93 @@ test("persists the shared profile across app routes", async ({ page }) => {
   await mockFitStatus(page, false);
   await mockAdmitIntelligenceStatus(page, false);
 
-  await page.goto("/start");
-  await page.getByLabel("GPA").fill("3.91");
-  await page.getByLabel("SAT").fill("1520");
-  await page.getByLabel("Intended major").fill("Data science");
-  await page.getByRole("button", { name: "Save profile" }).click();
+  await setProfileOnStart(page, {
+    gpa: "3.91",
+    sat: "1520",
+    major: "Data science",
+  });
 
   await page.goto("/dashboard");
   await expect(page.getByText("Data science").first()).toBeVisible();
 
   await page.goto("/schools");
-  await expect(page.getByTestId("profile-summary")).toContainText("GPA 3.91");
-  await expect(page.getByTestId("profile-summary")).toContainText("SAT 1520");
-  await expect(page.getByTestId("profile-summary")).toContainText("Data science");
+  await expect(page.getByTestId("profile-spine")).toContainText("GPA 3.91");
+  await expect(page.getByTestId("profile-spine")).toContainText("SAT 1520");
+  await expect(page.getByTestId("profile-spine")).toContainText("Data science");
+  // The full profile form should never re-render outside /start.
+  await expect(page.getByLabel("GPA")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save profile" })).toHaveCount(0);
+});
+
+test("splits each route to one job with a profile spine everywhere but /start", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, true);
+  await mockAdmitIntelligenceStatus(page, false);
+
+  // The full profile form lives only on /start.
+  await page.goto("/start");
+  await expect(page.getByLabel("GPA")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save profile" })).toBeVisible();
+
+  await setProfileOnStart(page, { gpa: "3.80", sat: "1450", major: "Biology" });
+
+  // /schools owns search + reads: a compact spine with an Edit link, no full
+  // form, no Fit Finder, no outcome-capture/sign-in.
+  await page.goto("/schools");
+  const spine = page.getByTestId("profile-spine");
+  await expect(spine).toContainText("GPA 3.80");
+  await expect(spine.getByRole("link", { name: "Edit" })).toHaveAttribute(
+    "href",
+    "/start",
+  );
+  await expect(page.getByLabel("GPA")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save profile" })).toHaveCount(0);
+  await expect(page.getByTestId("fit-finder-panel")).toHaveCount(0);
+  await expect(page.getByTestId("outcome-capture-flow")).toHaveCount(0);
+  await expect(page.getByTestId("outcome-capture-closed")).toHaveCount(0);
+
+  // Fit Finder owns its own route, still a spine and never the full form.
+  await page.goto("/fit");
+  await expect(page.getByTestId("fit-finder-panel")).toBeVisible();
+  await expect(page.getByTestId("profile-spine")).toBeVisible();
+  await expect(page.getByLabel("GPA")).toHaveCount(0);
+
+  // Account owns outcome capture / sign-in.
+  await page.goto("/settings");
+  await expect(page.getByTestId("outcome-capture-closed")).toBeVisible();
+  await expect(page.getByLabel("GPA")).toHaveCount(0);
+
+  // The dashboard never re-renders the full form either.
+  await page.goto("/dashboard");
+  await expect(page.getByLabel("GPA")).toHaveCount(0);
+});
+
+test("never shows the words honest or confident in user-facing copy", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+
+  const routes = [
+    "/",
+    "/start",
+    "/schools",
+    "/fit",
+    "/settings",
+    "/dashboard",
+    "/money",
+    "/methodology",
+    "/privacy",
+  ];
+  for (const route of routes) {
+    await page.goto(route);
+    const text = (await page.locator("body").innerText()).toLowerCase();
+    expect(text, `${route} must not say "honest"`).not.toContain("honest");
+    expect(text, `${route} must not say "confiden"`).not.toContain("confiden");
+  }
 });
 
 test("keeps outcome capture closed when the server flag is disabled", async ({
@@ -856,7 +962,7 @@ test("keeps outcome capture closed when the server flag is disabled", async ({
     },
   );
 
-  await page.goto("/schools");
+  await page.goto("/settings");
 
   await expect(page.getByTestId("outcome-capture-closed")).toContainText(
     "Outcome capture is not currently open",
@@ -886,9 +992,10 @@ test("keeps Fit Finder dark when the server flag is disabled", async ({
     });
   });
 
-  await page.goto("/schools");
+  await page.goto("/fit");
 
   await expect(page.getByTestId("fit-finder-panel")).toHaveCount(0);
+  await expect(page.getByTestId("route-disabled")).toBeVisible();
 
   const statuses = await page.evaluate(async () => {
     const fit = await fetch("/api/fit", { method: "POST", body: "{}" });
@@ -930,12 +1037,13 @@ test("keeps admission loading skeleton honest while chance request is pending", 
     });
   });
 
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+  });
   await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Intended major").fill("Computer science");
-  await page.getByRole("button", { name: "Save profile" }).click();
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
@@ -1164,7 +1272,7 @@ test("renders privacy policy and links it from the consent flow", async ({
   await mockOutcomeStatus(page, true);
   await mockFitStatus(page, false);
   await mockSupabaseAuth(page);
-  await page.goto("/dashboard");
+  await page.goto("/settings");
   await expect(page.getByRole("link", { name: "Privacy" }).first()).toHaveAttribute(
     "href",
     "/privacy",
@@ -1231,7 +1339,7 @@ test("records consent, profile, and one outcome through the enabled capture flow
     });
   });
 
-  await page.goto("/schools");
+  await page.goto("/settings");
 
   const captureFlow = await signInOutcomePanel(page);
 
@@ -1358,7 +1466,7 @@ test("exports, revokes, and deletes signed-in outcome data with confirmation", a
     });
   });
 
-  await page.goto("/schools");
+  await page.goto("/settings");
   await signInOutcomePanel(page);
 
   const controls = page.getByTestId("outcome-data-controls");
@@ -1433,10 +1541,8 @@ test("runs Fit Finder, renders grounded prose, and adds a school to the list", a
     });
   });
 
-  await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await setProfileOnStart(page, { gpa: "3.95", sat: "1540", act: "35" });
+  await page.goto("/fit");
 
   const finder = await fillFitFinderForm(page);
 
@@ -1481,6 +1587,8 @@ test("runs Fit Finder, renders grounded prose, and adds a school to the list", a
   expect(explainRequests).toBe(1);
 
   await finder.getByRole("button", { name: "Add to my Admira list" }).click();
+  // The school read renders on /schools, not on the Fit Finder route.
+  await page.goto("/schools");
   await expect(page.getByTestId("result-card")).toContainText(
     "Massachusetts Institute of Technology",
   );
@@ -1503,10 +1611,8 @@ test("keeps Fit Finder cards useful when Claude explanation falls back", async (
     });
   });
 
-  await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
+  await setProfileOnStart(page, { gpa: "3.95", sat: "1540", act: "35" });
+  await page.goto("/fit");
 
   const finder = await fillFitFinderForm(page);
   const fitCard = finder.getByTestId("fit-result-card");
@@ -1555,16 +1661,14 @@ test("renders Admit Intelligence for a US school when the flag is enabled", asyn
     });
   });
 
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+    activities: "Robotics captain and research internship.",
+  });
   await page.goto("/schools");
-  await expect(page.getByText("Profile Studio").first()).toBeVisible();
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Intended major").fill("Computer science");
-  await page
-    .getByPlaceholder(/Robotics captain/)
-    .fill("Robotics captain and research internship.");
-  await page.getByRole("button", { name: "Save profile" }).click();
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
@@ -1573,7 +1677,7 @@ test("renders Admit Intelligence for a US school when the flag is enabled", asyn
   const card = page.getByTestId("admit-card");
   await expect(card).toContainText("Admit Intelligence");
   await expect(card).toContainText("Reach at 3/100");
-  await expect(card).toContainText("Model confidence");
+  await expect(card).toContainText("Model certainty");
   await expect(card).toContainText("School selectivity");
   await expect(card.getByTestId("profile-studio")).toContainText(
     "Five-axis profile read",
@@ -1612,17 +1716,13 @@ test("renders Admit Intelligence for a Canadian program when the flag is enabled
     });
   });
 
+  await setProfileOnStart(page, {
+    major: "Computer Science",
+    canadianAverage: "92",
+    prerequisites: "ENG4U, MHF4U, MCV4U",
+    activities: "AIF, robotics, and math contests.",
+  });
   await page.goto("/schools");
-  await expect(page.getByText("Profile Studio").first()).toBeVisible();
-  await page.getByLabel("Intended major").fill("Computer Science");
-  await page.getByLabel("Canadian average").fill("92");
-  await page
-    .getByLabel("Completed prerequisites")
-    .fill("ENG4U, MHF4U, MCV4U");
-  await page
-    .getByPlaceholder(/Robotics captain/)
-    .fill("AIF, robotics, and math contests.");
-  await page.getByRole("button", { name: "Save profile" }).click();
   await page.getByLabel("Search by school name").fill("Waterloo");
   await page
     .getByRole("button", { name: /University of Waterloo/ })
@@ -1715,15 +1815,13 @@ test("renders Students-Like-You k-safe aggregates when the flag is enabled", asy
     });
   });
 
-  await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Intended major").fill("Computer science");
-  await page
-    .getByPlaceholder(/Robotics captain/)
-    .fill("Robotics captain and research internship.");
-  await page.getByRole("button", { name: "Save profile" }).click();
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+    activities: "Robotics captain and research internship.",
+  });
   await page.goto("/students-like-you");
   const panel = page.getByTestId("sly-panel");
   await expect(panel).toContainText("Students Like You");
@@ -1864,17 +1962,21 @@ test("renders Climb Roadmap computed deltas when the flag is enabled", async ({
     });
   });
 
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    activities: "Robotics captain",
+    major: "Computer science",
+  });
   await page.goto("/schools");
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Activities and context").fill("Robotics captain");
-  await page.getByLabel("Intended major").fill("Computer science");
-  await page.getByRole("button", { name: "Save profile" }).click();
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
     .click();
+  await expect(page.getByTestId("result-card")).toContainText(
+    "Massachusetts Institute of Technology",
+  );
 
   await page.goto("/climb");
   const panel = page.getByTestId("climb-panel");
@@ -2152,15 +2254,16 @@ test("renders an honest elite-school result and methodology disclosure", async (
 }) => {
   await mockOutcomeStatus(page, false);
   await mockFitStatus(page, false);
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+  });
   await page.goto("/schools");
 
-  await expect(page).toHaveTitle(/School Universe \| Admira/);
-  await page.getByLabel("GPA").fill("3.95");
-  await page.getByLabel("SAT").fill("1540");
-  await page.getByRole("textbox", { exact: true, name: "ACT" }).fill("35");
-  await page.getByLabel("Intended major").fill("Computer science");
-  await page.getByRole("button", { name: "Save profile" }).click();
-  await expect(page.getByTestId("profile-summary")).toContainText("GPA 3.95");
+  await expect(page).toHaveTitle(/Find schools \| Admira/);
+  await expect(page.getByTestId("profile-spine")).toContainText("GPA 3.95");
   await page.getByLabel("Search by school name").fill("Massachusetts");
   await page
     .getByRole("button", { name: /Massachusetts Institute of Technology/ })
@@ -2202,7 +2305,6 @@ test("renders an honest elite-school result and methodology disclosure", async (
   await expect(
     page.getByRole("button", { name: "Balance my list" }),
   ).toBeVisible();
-  await expect(page.getByText(/your chance/i)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Switch to dark mode" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

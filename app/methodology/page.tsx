@@ -102,8 +102,8 @@ export default function MethodologyPage() {
             <div className="brand-copy">
               <h1>Methodology</h1>
               <p>
-                Admira pairs school-fit evidence with chance ranges, and keeps
-                both honest about what public data can and cannot see.
+                Admira pairs school-fit evidence with chance ranges, and is
+                clear about what public data can and cannot show.
               </p>
             </div>
           </div>
@@ -140,8 +140,8 @@ export default function MethodologyPage() {
               Admira combines public College Scorecard fields, selectivity tiers,
               test ranges, school context, and seeded CDS C7 admissions
               priorities into an 80% prior interval. The single probability is
-              shown only as a marker inside that interval because the interval
-              is the honest object.
+              shown only as a marker inside that interval, because the interval
+              is the real answer.
             </p>
           </section>
 
@@ -219,7 +219,7 @@ export default function MethodologyPage() {
               preferences with each school&apos;s published attributes: programs,
               size, setting, region, public outcomes, and published cost. It
               uses text embeddings to find nearby school records, then attaches
-              the same honest chancing range Admira uses elsewhere.
+              the same chance range Admira uses elsewhere.
             </p>
             <ul className="method-list">
               <li>
@@ -262,7 +262,7 @@ export default function MethodologyPage() {
                   <>
                     Status: <strong>{calibrationReport.status}</strong>. Source:{" "}
                     <strong>{calibrationReport.source}</strong>. Production claims
-                    require consented Supabase outcomes.
+                    require consented real outcomes.
                   </>
                 ) : (
                   <>

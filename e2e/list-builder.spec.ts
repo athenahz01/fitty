@@ -208,7 +208,7 @@ test("keeps the List Builder dark when the server flag is disabled", async ({
 
   await page.goto("/list");
   await expect(page.getByTestId("route-disabled")).toContainText(
-    "Smart List Builder is not currently open.",
+    "Smart List Builder isn't available yet.",
   );
   await expect(page.getByTestId("list-builder-panel")).toHaveCount(0);
 });

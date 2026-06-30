@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Search,
   Share2,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Sun,
@@ -464,76 +465,92 @@ export type AdmiraView =
   | "dashboard"
   | "start"
   | "schools"
+  | "fit"
   | "list"
   | "students-like-you"
   | "climb"
   | "command-center"
   | "reports"
-  | "money";
+  | "money"
+  | "settings";
 
 const viewMeta: Record<AdmiraView, { label: string; kicker: string; title: string; intro: string }> = {
   dashboard: {
     label: "Dashboard",
-    kicker: "Signed-in home",
-    title: "Your admissions cockpit.",
+    kicker: "Home",
+    title: "Your application at a glance.",
     intro:
-      "A confident view of the schools, list moves, and next application actions powered by one shared profile.",
+      "Your top school read, list balance, and next steps — all built from the profile you set once.",
   },
   start: {
     label: "Profile Studio",
-    kicker: "Onboarding",
-    title: "Set the profile once.",
+    kicker: "Your profile",
+    title: "Build your profile.",
     intro:
-      "These academic inputs become the shared read across schools, list building, Climb, Command Center, and Copilot.",
+      "Enter your grades and scores once. Every school read, list, and plan uses them, so you never have to re-type them.",
   },
   schools: {
     label: "School Universe",
-    kicker: "Explore",
-    title: "Find schools and open the read.",
+    kicker: "Find schools",
+    title: "Search schools and see your chances.",
     intro:
-      "Search the public school set, add reads, and keep fit evidence separate from admission odds.",
+      "Look up any school to see your chance range and how well you fit.",
+  },
+  fit: {
+    label: "Fit Finder",
+    kicker: "Find your fit",
+    title: "Find schools that fit you.",
+    intro:
+      "Tell us what you're looking for and we'll surface schools that match what you want in a college.",
   },
   list: {
     label: "Smart List",
-    kicker: "Build",
-    title: "Balance the school list.",
+    kicker: "Build your list",
+    title: "Build a balanced college list.",
     intro:
-      "The list builder keeps reach, target, and likely structure tied to the same profile inputs.",
+      "Keep a healthy mix of reach, target, and likely schools, all tied to your profile.",
   },
   "students-like-you": {
     label: "Students Like You",
-    kicker: "Cohorts",
-    title: "See similar outcomes only when k-safe.",
+    kicker: "Outcomes",
+    title: "Where similar students got in.",
     intro:
-      "Outcome context appears only when the cohort is large enough to protect privacy.",
+      "See outcomes from students with profiles like yours — shown only when the group is large enough to stay anonymous.",
   },
   climb: {
     label: "Climb Roadmap",
     kicker: "Improve",
-    title: "Rank the next credible move.",
+    title: "Improve your chances.",
     intro:
-      "Numeric deltas come from rescoring or published spreads; unseen factors stay direction-only.",
+      "See which moves raise your odds the most, based on real data — never a made-up number.",
   },
   "command-center": {
     label: "Command Center",
-    kicker: "Execute",
-    title: "Turn the list into tasks.",
+    kicker: "Plan",
+    title: "Plan your applications.",
     intro:
-      "Requirements, deadlines, and documents stay organized around the schools already on your list.",
+      "Turn your school list into requirements, tasks, and deadlines you can stay on top of.",
   },
   reports: {
     label: "Reports",
-    kicker: "Package",
-    title: "Generate the shareable plan.",
+    kicker: "Share",
+    title: "Build your report.",
     intro:
-      "Reports assemble module outputs and sources without inventing new numbers.",
+      "Package your school reads and plan into a report you can share.",
   },
   money: {
     label: "Money",
     kicker: "Soon",
-    title: "Money intelligence is deferred.",
+    title: "Costs and aid — coming soon.",
     intro:
-      "Net price, merit, and ROI stay labeled as coming soon until the data layer is ready.",
+      "Net price, merit aid, and ROI aren't ready yet. We'll add them once the data is solid.",
+  },
+  settings: {
+    label: "Account",
+    kicker: "Account",
+    title: "Your account and data.",
+    intro:
+      "Sign in, optionally share your application outcomes, and manage your data. Only you can see your information.",
   },
 };
 
@@ -1126,6 +1143,7 @@ function useTheme() {
 export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, setProfile } = useAdmiraProfile();
   const [schoolQuery, setSchoolQuery] = useState("");
   const [schoolResults, setSchoolResults] = useState<SchoolSearchRow[]>([]);
@@ -1638,15 +1656,11 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
                 onAddSchool={addSchool}
                 onRemoveSchool={removeSchool}
                 onRecalculate={recalculateAll}
+                onStartSaved={() => router.push("/dashboard")}
               />
             </div>
           </section>
         </div>
-
-        <OutcomeSessionProvider>
-          <OutcomeCapturePanel />
-          <OutcomeDataControlsPanel />
-        </OutcomeSessionProvider>
 
         {copilotStatus === "enabled" ? (
           <CopilotDrawer
@@ -1659,8 +1673,8 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
 
         <footer className="app-footer">
           <p>
-            Admira leads with a confident read while keeping the range, limits,
-            and methodology close at hand.
+            Admira gives you a clear chance read for every school, with the
+            range and methodology always a click away.
           </p>
           <nav className="footer-links" aria-label="Admira policy links">
             <Link className="footer-link" href="/methodology">
@@ -1708,7 +1722,7 @@ function AppSidebar({
         </div>
         <div className="brand-copy">
           <h1>Admira</h1>
-          <p>honest reads</p>
+          <p>your college chances</p>
         </div>
       </Link>
 
@@ -1724,6 +1738,11 @@ function AppSidebar({
       <NavItem href="/schools" active={view === "schools"} icon={<Search size={17} />}>
         School Universe
       </NavItem>
+      {statuses.fitFinder === "enabled" ? (
+        <NavItem href="/fit" active={view === "fit"} icon={<Compass size={17} />}>
+          Fit Finder
+        </NavItem>
+      ) : null}
       {statuses.listBuilder === "enabled" ? (
         <NavItem href="/list" active={view === "list"} icon={<SlidersHorizontal size={17} />}>
           Smart List
@@ -1773,6 +1792,11 @@ function AppSidebar({
       ) : null}
       <NavItem href="/money" active={view === "money"} icon={<FileText size={17} />} badge="Soon">
         Money
+      </NavItem>
+
+      <div className="nav-grp">Account</div>
+      <NavItem href="/settings" active={view === "settings"} icon={<ShieldCheck size={17} />}>
+        Account
       </NavItem>
 
       <Link className="profile-chip" href="/start">
@@ -1827,7 +1851,7 @@ function RouteHero({
         <p className="helper route-intro">{meta.intro}</p>
       </div>
       <div className="route-profile-chip">
-        <span className="micro-label">Ready reads</span>
+        <span className="micro-label">Schools scored</span>
         <strong className="mono">{readySchools}</strong>
       </div>
     </section>
@@ -1858,6 +1882,7 @@ function RouteBody({
   onAddSchool,
   onRemoveSchool,
   onRecalculate,
+  onStartSaved,
 }: {
   view: AdmiraView;
   profile: Profile;
@@ -1882,6 +1907,7 @@ function RouteBody({
   onAddSchool: (school: SchoolSearchRow) => void;
   onRemoveSchool: (unitid: number) => void;
   onRecalculate: () => void;
+  onStartSaved: () => void;
 }) {
   if (view === "start") {
     return (
@@ -1894,6 +1920,7 @@ function RouteBody({
           noAcademicInput={noAcademicInput}
           admitIntelligenceEnabled={admitIntelligenceEnabled}
           onSave={onRecalculate}
+          onSaved={onStartSaved}
         />
         <ProfileGateCard />
       </div>
@@ -1919,48 +1946,57 @@ function RouteBody({
 
   if (view === "schools") {
     return (
-      <div className="route-grid schools-route-grid">
-        <ProfilePanel
+      <div className="route-stack">
+        <ProfileSpine profile={profile} />
+        <SchoolSearchPanel
+          query={schoolQuery}
+          setQuery={setSchoolQuery}
+          results={schoolResults}
+          status={schoolSearchStatus}
+          error={schoolSearchError}
+          onAdd={onAddSchool}
+          addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
+        />
+        <SchoolReadsSection
+          addedSchools={addedSchools}
+          profile={profile}
+          onRemoveSchool={onRemoveSchool}
+          onRecalculate={onRecalculate}
+          onPick={setSchoolQuery}
+        />
+        {readyBalanceLabels.length > 0 ? (
+          <BalancePanel labels={readyBalanceLabels} />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (view === "fit") {
+    return fitFinderStatus === "enabled" ? (
+      <div className="route-stack">
+        <ProfileSpine profile={profile} />
+        <FitFinderPanel
           profile={profile}
           setProfile={setProfile}
-          errors={profileErrors}
-          notice={formNotice}
-          noAcademicInput={noAcademicInput}
-          admitIntelligenceEnabled={admitIntelligenceEnabled}
-          onSave={onRecalculate}
+          profileErrors={profileErrors}
+          profileReady={hasProfileForFit(profile)}
+          onAddSchool={onAddSchool}
+          addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
         />
-        <div className="route-stack">
-          {fitFinderStatus === "enabled" ? (
-            <FitFinderPanel
-              profile={profile}
-              setProfile={setProfile}
-              profileErrors={profileErrors}
-              profileReady={hasProfileForFit(profile)}
-              onAddSchool={onAddSchool}
-              addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
-            />
-          ) : null}
-          <SchoolSearchPanel
-            query={schoolQuery}
-            setQuery={setSchoolQuery}
-            results={schoolResults}
-            status={schoolSearchStatus}
-            error={schoolSearchError}
-            onAdd={onAddSchool}
-            addedUnitids={addedSchools.map((entry) => entry.school.unitid)}
-          />
-          <SchoolReadsSection
-            addedSchools={addedSchools}
-            profile={profile}
-            onRemoveSchool={onRemoveSchool}
-            onRecalculate={onRecalculate}
-            onPick={setSchoolQuery}
-          />
-          {readyBalanceLabels.length > 0 ? (
-            <BalancePanel labels={readyBalanceLabels} />
-          ) : null}
-        </div>
       </div>
+    ) : (
+      <FeatureUnavailable label="Fit Finder" />
+    );
+  }
+
+  if (view === "settings") {
+    return (
+      <OutcomeSessionProvider>
+        <div className="route-stack">
+          <OutcomeCapturePanel />
+          <OutcomeDataControlsPanel />
+        </div>
+      </OutcomeSessionProvider>
     );
   }
 
@@ -2010,16 +2046,41 @@ function RouteBody({
 function ProfileGateCard() {
   return (
     <section className="route-card profile-gate-card">
-      <div className="section-kicker">Shared profile state</div>
-      <h3 className="section-title">One profile, every route.</h3>
+      <div className="section-kicker">Set it once</div>
+      <h3 className="section-title">One profile, every page.</h3>
       <p className="helper">
-        Admira stores these inputs in the route-level profile context. School
-        reads, Smart List, Climb, Reports, and Copilot all read the same profile
-        without asking the student to re-enter it.
+        Enter your grades and scores here once. Your school chances, college
+        list, improvement plan, and reports all use the same profile, so you
+        never have to type it again.
       </p>
       <div className="phase5-empty">
         <Check size={18} aria-hidden="true" />
-        <span>Owner-RLS remains the persistence path for signed-in profile data.</span>
+        <span>Only you can see your profile. Your inputs never train our model.</span>
+      </div>
+    </section>
+  );
+}
+
+function ProfileSpine({ profile }: { profile: Profile }) {
+  const ready = profileReadiness(profile);
+  return (
+    <section className="route-card profile-spine" data-testid="profile-spine">
+      <div className="profile-avatar-mini" aria-hidden="true">
+        {profile.intendedMajor.trim().charAt(0).toUpperCase() || "A"}
+      </div>
+      <div className="profile-spine-copy">
+        <span className="micro-label">Your profile</span>
+        <ul className="profile-chip-row" aria-label="Your profile">
+          {profileSummaryItems(profile).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+      <div className="profile-spine-actions">
+        <span className="mono profile-spine-ready">{ready}% ready</span>
+        <Link className="profile-edit" href="/start">
+          Edit
+        </Link>
       </div>
     </section>
   );
@@ -2057,18 +2118,18 @@ function DashboardHome({
             </>
           ) : (
             <>
-              <h3>Add a school to see the verdict.</h3>
-              <p>Use School Universe to generate the first range from the same profile.</p>
+              <h3>Add a school to see your chances.</h3>
+              <p>Search any school and we&apos;ll show your chance range from your profile.</p>
               <Link className="add-button split-cta" href="/schools">
-                Browse schools
+                Find schools
               </Link>
             </>
           )}
         </div>
         <div className="verdict-data-surface">
-          <div className="section-kicker">Profile spine</div>
+          <div className="section-kicker">Your profile</div>
           <h3 className="section-title">{profile.intendedMajor || "Major undecided"}</h3>
-          <ul className="profile-chip-row" aria-label="Current shared profile">
+          <ul className="profile-chip-row" aria-label="Your profile">
             {profileSummaryItems(profile).map((item) => (
               <li key={item}>{item}</li>
             ))}
@@ -2077,7 +2138,7 @@ function DashboardHome({
             <BalancePanel labels={balanceLabels} />
           ) : (
             <p className="helper">
-              List balance appears after at least one school has a completed read.
+              Your list balance appears once at least one school has a chance read.
             </p>
           )}
         </div>
@@ -2137,7 +2198,7 @@ function DashboardLinkCard({
       <span className="section-kicker">{eyebrow}</span>
       <strong>{title}</strong>
       <span className="helper">
-        {enabled ? "Open module" : "Hidden until its feature flag is enabled."}
+        {enabled ? "Open" : "Coming soon"}
       </span>
     </Link>
   );
@@ -2165,7 +2226,7 @@ function SchoolReadsSection({
       <div className="results-head">
         <div>
           <div className="section-kicker">Your schools</div>
-          <h2 className="section-title">Confident verdicts, honest ranges.</h2>
+          <h2 className="section-title">Your chances, school by school.</h2>
         </div>
         <span className="results-count mono">
           {addedSchools.length} added &middot; sorted by odds
@@ -2195,14 +2256,14 @@ function SchoolReadsSection({
 function FeatureUnavailable({ label }: { label: string }) {
   return (
     <section className="route-card" data-testid="route-disabled">
-      <div className="section-kicker">Feature flag off</div>
-      <h3 className="section-title">{label} is not currently open.</h3>
+      <div className="section-kicker">Coming soon</div>
+      <h3 className="section-title">{label} isn&apos;t available yet.</h3>
       <p className="helper">
-        This route is wired, but the module remains gated until its server
-        status endpoint reports enabled.
+        We&apos;re still polishing this one. Check back soon — your profile and
+        schools will be ready when it opens.
       </p>
       <Link className="add-button route-card-action" href="/dashboard">
-        Return to dashboard
+        Back to dashboard
       </Link>
     </section>
   );
@@ -2211,15 +2272,15 @@ function FeatureUnavailable({ label }: { label: string }) {
 function MoneyComingSoon() {
   return (
     <section className="route-card money-stub" data-testid="money-stub">
-      <div className="section-kicker">Money module</div>
-      <h3 className="section-title">Coming soon: net price, merit, and ROI.</h3>
+      <div className="section-kicker">Coming soon</div>
+      <h3 className="section-title">Costs and aid are coming soon.</h3>
       <p className="helper">
-        Admira is not predicting money yet. This page stays as a labeled stub
-        until the data and model pass audit.
+        We&apos;re not showing net price, merit aid, or ROI yet. We&apos;ll add
+        them once the numbers are solid and worth trusting.
       </p>
       <div className="phase5-empty">
         <CircleHelp size={18} aria-hidden="true" />
-        <span>No cost, scholarship, or ROI numbers are shown here.</span>
+        <span>No cost, scholarship, or ROI figures appear here yet.</span>
       </div>
     </section>
   );
@@ -2247,8 +2308,8 @@ function CopilotDrawer({
       <aside className="copilot-drawer" aria-hidden={!open}>
         <div className="copilot-drawer-head">
           <div>
-            <div className="section-kicker">Persistent Copilot</div>
-            <h3 className="section-title">Tool-grounded planning.</h3>
+            <div className="section-kicker">Copilot</div>
+            <h3 className="section-title">Ask about your plan.</h3>
           </div>
           <button className="icon-button" type="button" onClick={onClose}>
             Close
@@ -2262,12 +2323,12 @@ function CopilotDrawer({
 
 function schoolVerdictLine(entry: AddedSchool) {
   if (entry.intelligence) {
-    return `${entry.intelligence.tier}. Lead with the read.`;
+    return `${entry.intelligence.tier} school for you.`;
   }
   if (entry.result) {
-    return `${formatBandLabel(entry.result.band.label)}. Range first under the hood.`;
+    return `${formatBandLabel(entry.result.band.label)} school for you.`;
   }
-  return "Read pending.";
+  return "Working on your read.";
 }
 
 function schoolVerdictMetric(entry: AddedSchool) {
@@ -2321,6 +2382,7 @@ function ProfilePanel({
   noAcademicInput,
   admitIntelligenceEnabled,
   onSave,
+  onSaved,
 }: {
   profile: Profile;
   setProfile: Dispatch<SetStateAction<Profile>>;
@@ -2329,6 +2391,7 @@ function ProfilePanel({
   noAcademicInput: boolean;
   admitIntelligenceEnabled: boolean;
   onSave: () => void;
+  onSaved?: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -2345,8 +2408,9 @@ function ProfilePanel({
 
   function handleSave() {
     onSave();
-    if (isComplete) {
+    if (errors.length === 0 && !hasFieldErrors) {
       setIsEditing(false);
+      onSaved?.();
     }
   }
 
@@ -2372,7 +2436,7 @@ function ProfilePanel({
           </div>
         </div>
         <p className="helper profile-rail-hint">
-          The more Admira knows, the tighter every range.
+          The more you add, the tighter your chance ranges.
         </p>
         {showSummary ? (
           <div className="profile-summary-card" data-testid="profile-summary">
@@ -2396,8 +2460,8 @@ function ProfilePanel({
             </ul>
             <p className="profile-scope-note">
               <CircleHelp size={14} aria-hidden="true" />
-              Academic inputs drive the range. Major, home state, and activities
-              help planning and Fit Finder context.
+              Your grades and scores drive the chance range. Major, home state,
+              and activities help with planning and finding schools that fit.
             </p>
           </div>
         ) : (
@@ -2568,7 +2632,7 @@ function ProfilePanel({
             <span className="field-label field-label-row">
               Activities and context
               <span className="not-scored-tag">
-                {admitIntelligenceEnabled ? "Profile Studio" : "Not scored yet"}
+                {admitIntelligenceEnabled ? "Helps your fit" : "Not scored yet"}
               </span>
             </span>
             <textarea
@@ -2579,8 +2643,8 @@ function ProfilePanel({
             />
             <span className="helper">
               {admitIntelligenceEnabled
-                ? "Used in Profile Studio axes for the flagged experience."
-                : "Context for planning, not scoring."}
+                ? "Helps shape your fit. It doesn't change your chance number."
+                : "Helps with planning. It isn't part of your chance number."}
             </span>
           </label>
         </div>
@@ -2595,8 +2659,8 @@ function ProfilePanel({
         ) : null}
         {noAcademicInput ? (
           <p className="helper profile-low-input">
-            No submitted SAT or ACT is being sent. Admira will still respond, but
-            the band is widened and marked low input confidence.
+            Without an SAT or ACT score, we&apos;ll still give you a read, but
+            the range will be wider because we have less to go on.
           </p>
         ) : null}
 
@@ -2799,8 +2863,8 @@ function ListBuilderPanel({
           One tap to a balanced list
         </h3>
         <p className="mt-1 text-sm opacity-70">
-          An auto-balanced reach / target / safety list with an honest one-line
-          reason per school. Tiers come straight from Admit Intelligence.
+          A balanced reach / target / safety list with a one-line reason for
+          each school. Tiers come straight from your school reads.
         </p>
       </header>
 
@@ -3937,7 +4001,7 @@ function FitFinderPanel({
       !preferences.learningStyleNotes.trim()
     ) {
       setStatus("error");
-      setError("Add interests, an intended major, or learning notes first.");
+      setError("Add your interests, an intended major, or a few preferences first.");
       return;
     }
 
@@ -4090,7 +4154,7 @@ function FitFinderPanel({
           </label>
 
           <label className="control wide-field">
-            <span className="field-label">Learning notes</span>
+            <span className="field-label">How you like to learn</span>
             <textarea
               className="activity-control"
               placeholder="Collaborative labs, discussion seminars, structured advising..."
@@ -4253,7 +4317,7 @@ function FitFinderResults({
       <div className="fit-empty">
         <Sparkles size={18} aria-hidden="true" />
         <p className="helper">
-          Add a few preferences to search the embedded school profile set.
+          Add a few preferences and we&apos;ll find schools that match.
         </p>
       </div>
     );
@@ -4506,7 +4570,7 @@ function FitResultCard({
             low={result.probability.low}
             high={result.probability.high}
             point={result.probability.calibrated}
-            label={`${result.school.name} honest range`}
+            label={`${result.school.name} chance range`}
             coverage={result.probability.coverage}
             showMarkerValue={false}
           />
@@ -5806,7 +5870,7 @@ function AdmitIntelligenceCard({
             {result.tier} at {result.score}/100.
           </p>
           <div className="confidence-texture">
-            <span className="micro-label">Model confidence</span>
+            <span className="micro-label">Model certainty</span>
             <span className="confidence-bars" aria-hidden="true">
               {Array.from({ length: 8 }).map((_, index) => (
                 <i
@@ -5948,7 +6012,7 @@ function ResultCard({
   onRemove: () => void;
 }) {
   const profileConfidence =
-    result.band.input_confidence === "low" ? "Low input confidence" : "Standard input";
+    result.band.input_confidence === "low" ? "Limited inputs" : "Standard inputs";
   const verdict = buildChanceVerdict(result);
   const displayLevers = visibleLevers(result.climb_levers ?? fallbackClimbLevers());
   const detailsDisclaimers = filteredDisclaimers(result.disclaimers);
@@ -5987,7 +6051,7 @@ function ResultCard({
       <section className="range-section" aria-labelledby={`range-${result.school.unitid}`}>
         <div>
           <div className="band-label" id={`range-${result.school.unitid}`}>
-            Our honest range
+            Your chance range
           </div>
           <div className="range-readout">
             <span className="range-value">
@@ -6000,7 +6064,7 @@ function ResultCard({
             low={result.probability.low}
             high={result.probability.high}
             point={result.probability.calibrated}
-          label={`${result.school.name} honest range`}
+          label={`${result.school.name} chance range`}
           coverage={result.probability.coverage}
         />
         <ReachLadder
@@ -6069,8 +6133,8 @@ function RangeBand({
   const width = Math.max(1, right - left);
   const pointLeft = clampPercent(point);
   const aria = showMarkerValue
-    ? `${label}: ${Math.round(coverage * 100)} percent honest range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)}; marker at ${formatPercentPrecise(point)}.`
-    : `${label}: ${Math.round(coverage * 100)} percent honest range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)} with an interior marker.`;
+    ? `${label}: ${Math.round(coverage * 100)} percent chance range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)}; marker at ${formatPercentPrecise(point)}.`
+    : `${label}: ${Math.round(coverage * 100)} percent chance range from ${formatPercentPrecise(low)} to ${formatPercentPrecise(high)} with an interior marker.`;
 
   return (
     <div
@@ -6119,7 +6183,7 @@ function ShareableRangeCard({
         <BandPill label={band} />
       </div>
       <div className="share-card-main">
-        <span className="micro-label">My honest range</span>
+        <span className="micro-label">My chance range</span>
         <h4>{schoolName}</h4>
         <strong className="share-range">{formatChanceRange(low, high)}</strong>
         <p>{verdict}</p>
@@ -6276,8 +6340,8 @@ function EmptyState({ onPick }: { onPick: (query: string) => void }) {
         </div>
         <h2 className="empty-title">Your first read appears here.</h2>
         <p className="empty-sub">
-          Add a school and Admira shows an honest range, never a single number,
-          plus what it cannot see.
+          Add a school and we&apos;ll show your chance as a range, plus what
+          goes into it.
         </p>
         <div className="popular-block">
           <div className="micro-label">Popular right now</div>

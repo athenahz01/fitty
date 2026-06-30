@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { SchoolUniverse } from "./school-universe";
 
 export const metadata: Metadata = {
-  title: "School Universe | Admira",
+  title: "School details",
   description:
     "A single view of a school's admit profile, programs, cost, outcomes, and similar programs.",
 };

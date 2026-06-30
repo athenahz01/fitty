@@ -130,7 +130,7 @@ export function OutcomeSessionProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setAuthStatus("error");
       setAuthError(
-        error instanceof Error ? error.message : "Supabase browser auth is not configured.",
+        error instanceof Error ? error.message : "Sign-in is not available right now.",
       );
     }
 
@@ -143,7 +143,7 @@ export function OutcomeSessionProvider({ children }: { children: ReactNode }) {
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) {
-      setAuthError("Supabase browser auth is not configured.");
+      setAuthError("Sign-in is not available right now.");
       return;
     }
 
@@ -257,8 +257,8 @@ export function OutcomeSignInGate() {
       <div className="capture-step">
         <div className="section-kicker">Sign in required</div>
         <p className="helper mt-2">
-          Use a Supabase account before saving consent, outcomes, or data requests.
-          The browser sends the session token with each request.
+          Sign in to save your consent, application outcomes, or data requests.
+          Only you can see your data.
         </p>
       </div>
       <div className="capture-form-grid two">

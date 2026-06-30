@@ -27,16 +27,16 @@ const spaceMono = Space_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Admira | Fit and Honest Chance",
+    default: "Admira | Your College Chances",
     template: "%s | Admira",
   },
   description:
-    "Honest college admissions odds rendered as public-data prior ranges, levers, and uncertainty disclosures.",
+    "See your real admissions chances at every school, find schools that fit, and build a balanced college list — for the US and Canada.",
   applicationName: "Admira",
   openGraph: {
-    title: "Admira | Fit and Honest Chance",
+    title: "Admira | Your College Chances",
     description:
-      "College admissions planning ranges grounded in public data, with clear limits on what cannot be known.",
+      "See your chances at every college, find schools that fit, and plan your applications — grounded in public data.",
     type: "website",
   },
 };

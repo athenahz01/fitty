@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { AdmiraApp } from "../admira-app";
 
 export const metadata: Metadata = {
-  title: "Students Like You | Admira",
-  description: "View k-safe similar-student outcome context.",
+  title: "Students like you",
+  description: "See where students with profiles like yours got in.",
 };
 
 export default function StudentsLikeYouPage() {

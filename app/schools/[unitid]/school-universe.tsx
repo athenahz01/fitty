@@ -93,12 +93,12 @@ function Stat({
   source: string;
 }) {
   return (
-    <div className="rounded-xl border border-black/10 bg-white/60 p-4 dark:border-white/10 dark:bg-white/5">
-      <div className="text-xs uppercase tracking-wide opacity-60">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">
-        {value ?? <span className="text-base font-normal opacity-50">Not published</span>}
+    <div className="uni-stat">
+      <div className="micro-label">{label}</div>
+      <div className="uni-stat-value mono">
+        {value ?? <span className="uni-stat-empty">Not published</span>}
       </div>
-      <div className="mt-1 text-[11px] opacity-40" title={source}>
+      <div className="uni-stat-source" title={source}>
         {source}
       </div>
     </div>
@@ -149,30 +149,45 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
 
   if (status === "disabled") {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-24" data-testid="universe-disabled">
-        <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
-          ← Admira
+      <main className="uni-page uni-page-narrow" data-testid="universe-disabled">
+        <Link href="/schools" className="uni-back">
+          ← Back to schools
         </Link>
-        <p className="mt-8 text-lg">School Universe is not currently open.</p>
+        <div className="uni-state-card">
+          <div className="section-kicker">Coming soon</div>
+          <p>School details aren&apos;t available yet.</p>
+        </div>
       </main>
     );
   }
 
   if (status === "loading") {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-24" data-testid="universe-loading">
-        <div className="h-8 w-64 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+      <main className="uni-page uni-page-narrow" data-testid="universe-loading">
+        <Link href="/schools" className="uni-back">
+          ← Back to schools
+        </Link>
+        <div className="uni-skeleton" aria-hidden="true">
+          <span className="band-scan" style={{ width: "60%", height: 30 }} />
+          <span className="band-scan" style={{ width: "85%" }} />
+          <span className="band-scan" style={{ width: "70%" }} />
+        </div>
+        <span className="sr-only" role="status">
+          Loading school details
+        </span>
       </main>
     );
   }
 
   if (status === "error" || !data) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-24" data-testid="universe-error">
-        <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
-          ← Admira
+      <main className="uni-page uni-page-narrow" data-testid="universe-error">
+        <Link href="/schools" className="uni-back">
+          ← Back to schools
         </Link>
-        <p className="mt-8 text-lg">{error || "Unable to load this school."}</p>
+        <div className="uni-state-card uni-state-error" role="alert">
+          {error || "Unable to load this school."}
+        </div>
       </main>
     );
   }
@@ -182,63 +197,63 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
   const act = band(data.admissions.act.low, data.admissions.act.high);
 
   return (
-    <main
-      className="mx-auto max-w-5xl px-6 py-12 sm:py-16"
-      data-testid="school-universe"
-    >
-      <Link href="/schools" className="text-sm opacity-60 hover:opacity-100">
-        ← Admira
+    <main className="uni-page" data-testid="school-universe">
+      <Link href="/schools" className="uni-back">
+        ← Back to schools
       </Link>
 
-      {/* Bold headline first, detail below the fold. */}
-      <header className="mt-6 border-b border-black/10 pb-8 dark:border-white/10">
-        <div className="flex flex-wrap items-center gap-2 text-sm opacity-70">
-          {titleCase(data.school.selectivity_tier) ? (
-            <span className="rounded-full bg-black/5 px-3 py-1 dark:bg-white/10">
-              {titleCase(data.school.selectivity_tier)}
-            </span>
-          ) : null}
-          {data.school.location ? <span>{data.school.location}</span> : null}
-          {data.school.setting ? <span>· {titleCase(data.school.setting)}</span> : null}
-          <span>· {data.school.country}</span>
+      {/* Split-verdict anchor: ink rail states the school identity + published
+          headline; the warm data surface holds the sourced stat grid. */}
+      <section className="uni-anchor">
+        <div className="uni-rail">
+          <div className="uni-tags">
+            {titleCase(data.school.selectivity_tier) ? (
+              <span className="uni-tag">{titleCase(data.school.selectivity_tier)}</span>
+            ) : null}
+            {data.school.location ? <span>{data.school.location}</span> : null}
+            {data.school.setting ? <span>· {titleCase(data.school.setting)}</span> : null}
+            <span>· {data.school.country}</span>
+          </div>
+          <h1 className="uni-name">{data.school.name}</h1>
+          <p className="uni-sub">
+            {admitRate ? (
+              <span data-testid="universe-admit-rate">
+                <span className="uni-sub-strong mono">{admitRate}</span> admit rate
+              </span>
+            ) : (
+              <span className="uni-sub-muted">Admit rate not published</span>
+            )}
+            {sat ? <span className="uni-sub-muted"> · SAT {sat}</span> : null}
+          </p>
         </div>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
-          {data.school.name}
-        </h1>
-        <p className="mt-3 text-xl">
-          {admitRate ? (
-            <span data-testid="universe-admit-rate">
-              <span className="font-semibold">{admitRate}</span> admit rate
-            </span>
-          ) : (
-            <span className="opacity-60">Admit rate not published</span>
-          )}
-          {sat ? <span className="opacity-70"> · SAT {sat}</span> : null}
-        </p>
-      </header>
-
-      <section className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Admit rate" value={admitRate} source={data.headline.admit_rate.source} />
-        <Stat label="SAT middle 50" value={sat} source={data.admissions.sat.low.source} />
-        <Stat label="ACT middle 50" value={act} source={data.admissions.act.low.source} />
-        <Stat
-          label="Avg GPA"
-          value={data.admissions.gpa_avg.value === null ? null : data.admissions.gpa_avg.value.toFixed(2)}
-          source={data.admissions.gpa_avg.source}
-        />
+        <div className="uni-rail-data">
+          <div className="uni-stat-grid">
+            <Stat label="Admit rate" value={admitRate} source={data.headline.admit_rate.source} />
+            <Stat label="SAT middle 50" value={sat} source={data.admissions.sat.low.source} />
+            <Stat label="ACT middle 50" value={act} source={data.admissions.act.low.source} />
+            <Stat
+              label="Avg GPA"
+              value={data.admissions.gpa_avg.value === null ? null : data.admissions.gpa_avg.value.toFixed(2)}
+              source={data.admissions.gpa_avg.source}
+            />
+          </div>
+        </div>
       </section>
 
-      <section className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Avg net price" value={money(data.cost.net_price_avg.value)} source={data.cost.net_price_avg.source} />
-        <Stat label="Sticker cost" value={money(data.cost.sticker_cost.value)} source={data.cost.sticker_cost.source} />
-        <Stat label="Median earnings 10yr" value={money(data.outcomes.median_earnings_10yr.value)} source={data.outcomes.median_earnings_10yr.source} />
-        <Stat label="Completion rate" value={pct(data.outcomes.completion_rate.value)} source={data.outcomes.completion_rate.source} />
+      <section className="uni-section">
+        <div className="section-kicker">Cost &amp; outcomes</div>
+        <div className="uni-stat-grid uni-stat-grid-4">
+          <Stat label="Avg net price" value={money(data.cost.net_price_avg.value)} source={data.cost.net_price_avg.source} />
+          <Stat label="Sticker cost" value={money(data.cost.sticker_cost.value)} source={data.cost.sticker_cost.source} />
+          <Stat label="Median earnings 10yr" value={money(data.outcomes.median_earnings_10yr.value)} source={data.outcomes.median_earnings_10yr.source} />
+          <Stat label="Completion rate" value={pct(data.outcomes.completion_rate.value)} source={data.outcomes.completion_rate.source} />
+        </div>
       </section>
 
       {data.programs.length > 0 ? (
-        <section className="mt-12" data-testid="universe-programs">
-          <h2 className="text-2xl font-semibold">Programs &amp; requirements</h2>
-          <div className="mt-4 space-y-4">
+        <section className="uni-section" data-testid="universe-programs">
+          <h2 className="uni-h2">Programs &amp; requirements</h2>
+          <div className="uni-card-stack">
             {data.programs.map((program) => {
               const cutoff =
                 program.cutoff_avg_low === null
@@ -248,39 +263,28 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
                     : `${program.cutoff_avg_low} ${program.cutoff_basis ?? ""}`;
               const prereqs = prereqList(program.prerequisites);
               return (
-                <article
-                  key={program.program_name}
-                  className="rounded-xl border border-black/10 p-5 dark:border-white/10"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-lg font-semibold">{program.program_name}</h3>
+                <article key={program.program_name} className="uni-card">
+                  <div className="uni-card-head">
+                    <h3 className="uni-card-title">{program.program_name}</h3>
                     {cutoff ? (
-                      <span className="text-sm font-medium opacity-80">
-                        Cutoff {cutoff.trim()}
-                      </span>
+                      <span className="uni-cutoff mono">Cutoff {cutoff.trim()}</span>
                     ) : (
-                      <span className="text-sm opacity-50">No cutoff loaded</span>
+                      <span className="uni-cutoff-empty">No cutoff loaded</span>
                     )}
                   </div>
                   {prereqs.length > 0 ? (
-                    <p className="mt-2 text-sm opacity-70">
-                      Prerequisites: {prereqs.join(", ")}
-                    </p>
+                    <p className="uni-card-note">Prerequisites: {prereqs.join(", ")}</p>
                   ) : null}
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-70">
+                  <div className="uni-card-tags">
                     {program.broad_based_admission ? (
-                      <span className="rounded bg-black/5 px-2 py-0.5 dark:bg-white/10">
-                        Broad-based review
-                      </span>
+                      <span className="uni-pill">Broad-based review</span>
                     ) : null}
                     {program.supplemental_app ? (
-                      <span className="rounded bg-black/5 px-2 py-0.5 dark:bg-white/10">
-                        Supplemental application
-                      </span>
+                      <span className="uni-pill">Supplemental application</span>
                     ) : null}
                     {program.source_url ? (
                       <a
-                        className="underline opacity-80 hover:opacity-100"
+                        className="uni-source-link"
                         href={program.source_url}
                         target="_blank"
                         rel="noreferrer"
@@ -297,14 +301,11 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
       ) : null}
 
       {data.school.program_areas.length > 0 ? (
-        <section className="mt-12">
-          <h2 className="text-2xl font-semibold">Fields of study</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
+        <section className="uni-section">
+          <h2 className="uni-h2">Fields of study</h2>
+          <div className="uni-tag-row">
             {data.school.program_areas.map((area) => (
-              <span
-                key={area}
-                className="rounded-full border border-black/10 px-3 py-1 text-sm dark:border-white/10"
-              >
+              <span key={area} className="uni-field-tag">
                 {area}
               </span>
             ))}
@@ -313,21 +314,15 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
       ) : null}
 
       {data.similar.length > 0 ? (
-        <section className="mt-12" data-testid="universe-similar">
-          <h2 className="text-2xl font-semibold">Similar programs</h2>
-          <p className="mt-1 text-sm opacity-60">
-            By Fit Finder program embeddings.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <section className="uni-section" data-testid="universe-similar">
+          <h2 className="uni-h2">Similar programs</h2>
+          <p className="helper uni-section-sub">Found by program similarity.</p>
+          <div className="uni-similar-grid">
             {data.similar.map((peer) => (
-              <Link
-                key={peer.unitid}
-                href={`/schools/${peer.unitid}`}
-                className="rounded-xl border border-black/10 p-4 transition hover:border-black/30 dark:border-white/10 dark:hover:border-white/30"
-              >
-                <div className="font-medium">{peer.name}</div>
+              <Link key={peer.unitid} href={`/schools/${peer.unitid}`} className="uni-similar-card">
+                <div className="uni-similar-name">{peer.name}</div>
                 {peer.program_areas && peer.program_areas.length > 0 ? (
-                  <div className="mt-1 text-sm opacity-60">
+                  <div className="uni-similar-areas">
                     {peer.program_areas.slice(0, 3).join(", ")}
                   </div>
                 ) : null}
@@ -338,11 +333,9 @@ export function SchoolUniverse({ unitid }: { unitid: number }) {
       ) : null}
 
       {data.notes.length > 0 ? (
-        <section className="mt-12 border-t border-black/10 pt-6 dark:border-white/10">
-          <h2 className="text-sm font-semibold uppercase tracking-wide opacity-60">
-            Data notes
-          </h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm opacity-70">
+        <section className="uni-section uni-notes">
+          <h2 className="section-kicker">Data notes</h2>
+          <ul className="uni-notes-list">
             {data.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}

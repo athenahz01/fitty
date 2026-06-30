@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { AdmiraApp } from "../admira-app";
 
 export const metadata: Metadata = {
-  title: "Money | Admira",
-  description: "A deferred Admira money module stub with no predicted figures.",
+  title: "Costs and aid",
+  description: "Net price, merit aid, and ROI — coming soon.",
 };
 
 export default function MoneyPage() {
