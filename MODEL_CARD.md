@@ -165,6 +165,54 @@ is present. The current phase excludes the user's own same-cycle rows from
 display cohorts and leaves scoring feedback off for a later, separately audited
 phase.
 
+## Phase 4 Money
+
+Money is feature-flagged by `ADMIRA_MONEY_ENABLED` (default false). When the flag
+is off, `/money`, `/api/money`, and Compass ROI remain dark or number-free.
+
+`lib/money` is a pure deterministic calculator over sourced reference rows:
+`money_merit_rules` and `money_net_price_bands`. The seed lives at
+`pipeline/data/merit/merit_seed.json`, with source notes in
+`pipeline/data/merit/SOURCES.md` and a holdout at
+`pipeline/audit/merit_validation_holdout.json`.
+
+Every returned money figure has exactly one basis: `verified` or `estimate`.
+Verified figures are copied from published source rows such as College Scorecard
+net-price-by-income, university automatic-merit tables, Canadian entrance-award
+pages, tuition pages, or sourced earnings tables. Estimated figures are derived
+from those sourced inputs and are labeled as estimates in the API and UI. There
+is no third category and no dollar value without an HTTPS `source_url`.
+
+The merit predictor applies published automatic-merit criteria deterministically:
+GPA/test-score tiers for US tables and percentage-average tiers for Canadian
+entrance awards. If multiple rules match, it chooses the highest annual award,
+then the highest priority, then `rule_id` order as a stable tie-break. If no rule
+matches, merit is zero and labeled as a conservative estimate.
+
+The net-price method uses the selected sourced net-price band, then avoids aid
+double-counting:
+
+`implied_aid = max(0, sticker_price - baseline_net_price)`
+
+`need_aid = max(0, implied_aid - predicted_merit)`
+
+`true_net_price = max(0, sticker_price - need_aid - predicted_merit)`
+
+This keeps the baseline need-aid signal and the predicted automatic merit from
+being counted twice, and it prevents negative net prices.
+
+ROI is derived after net price. Four-year net cost is `true_net_price * 4`.
+Gross payback years is `four_year_net_cost / median_earnings_10yr` when a
+sourced earnings figure is loaded; otherwise ROI stays unavailable. US earnings
+come from College Scorecard rows in the seed. Canadian seeded rows use sourced
+field-level earnings where school-level Scorecard-style earnings are not
+available, so payback and earnings-to-cost ratio remain estimates even when the
+underlying earnings figure is copied from a verified source.
+
+`npm run money:validate` checks the committed holdout (at least 20 rows) against
+the predictor and net-price selector, including verified merit tiers, sourced
+net-price bands, true-net math, payback math, lineage, and non-negative outputs.
+
 ## Phase 5 Climb Roadmap + Command Center
 
 Climb Roadmap is feature-flagged by `ADMIRA_CLIMB_ENABLED` (default false). Each
@@ -251,7 +299,7 @@ raw essay text. Essays are ephemeral — there is no essay storage table this ph
 (so no owner-RLS surface to add); the demographic-key guard
 (`assertNoForbiddenDemographicKeys`) runs on the request.
 
-### Compass: real admit odds, sourced earnings, deferred ROI
+### Compass: real admit odds, sourced earnings, Money ROI
 
 `lib/compass` is a deterministic assembler. It connects majors → careers → sourced
 earnings and ranks major fit by embedding similarity (keyword fallback). Each
@@ -264,10 +312,12 @@ data); a missing figure stays null and is labeled "pending dataset", never
 fabricated. Each major now carries a deterministic, **number-free `reason`** that
 ties it to the student's stated interests and names a real career it opens, so the
 list reads as specific recommendations rather than a generic catalog; the reason
-is assembled from the same sourced rows and invents no figure. **ROI / net price
-is a clearly-labeled deferred stub** (`ROI_STUB`, no number) — it arrives with the
-Money module (Phase 4). No essay or cohort data is fed back into the admit score
-(leakage stays off).
+is assembled from the same sourced rows and invents no figure. ROI / net price is
+number-free unless `ADMIRA_MONEY_ENABLED` is true and the selected school has
+sourced Money rows. In that case Compass receives a `MoneyPlan` from `lib/money`
+and displays the same true net price, four-year cost, payback, basis labels, and
+sources. Without that plan it keeps `ROI_STUB`. No essay or cohort data is fed
+back into the admit score (leakage stays off).
 
 ## Phase 7 Admira Copilot + Reports
 
@@ -294,10 +344,10 @@ names, never a figure) and is instructed to answer the question, cite the module
 each fact came from, and end with a concrete next step. The grounding is richer;
 the guards are unchanged — `sanitizeModelText` still scrubs any numeral and
 `assertChatNumbersCameFromTools` still rejects any figure absent from a tool
-result. Money planning remains out of scope
-for this phase; Copilot does not register a money tool, and report rendering
-omits list-builder net-cost fields plus Compass ROI/earnings fields. Report
-figures are copied from the tool receipts that produced them.
+result. Copilot does not register a money tool in this phase; Money numbers are
+served by `/api/money` and injected into Compass only through `lib/money`. Report
+rendering still omits list-builder net-cost fields plus Compass ROI/earnings
+fields. Report figures are copied from the tool receipts that produced them.
 
 Report shares are stored in `report_shares` behind RLS (`subject_id =
 auth.uid()`). Share creation requires a signed-in owner bearer token. Public

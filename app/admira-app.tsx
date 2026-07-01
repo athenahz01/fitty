@@ -39,6 +39,7 @@ import type {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
+import type { MoneyIncomeBand, MoneyPlan, MoneyResidency } from "@/lib/money";
 import { searchLocalSchoolFixtures } from "@/lib/school-fixtures";
 import { searchSchools, type SchoolSearchResult } from "@/lib/school-search";
 
@@ -469,6 +470,7 @@ type CopilotStatus = "checking" | "enabled" | "disabled";
 type ReportsStatus = "checking" | "enabled" | "disabled";
 type NarrativeStatus = "checking" | "enabled" | "disabled";
 type CompassStatus = "checking" | "enabled" | "disabled";
+type MoneyStatus = "checking" | "enabled" | "disabled";
 export type AdmiraView =
   | "dashboard"
   | "start"
@@ -548,10 +550,10 @@ const viewMeta: Record<AdmiraView, { label: string; kicker: string; title: strin
   },
   money: {
     label: "Money",
-    kicker: "Soon",
-    title: "Costs and aid — coming soon.",
+    kicker: "Costs",
+    title: "Know the price before you decide.",
     intro:
-      "Net price, merit aid, and ROI aren't ready yet. We'll add them once the data is solid.",
+      "Compare sticker price, predicted automatic merit, net cost, and payback from sourced inputs.",
   },
   settings: {
     label: "Account",
@@ -575,6 +577,14 @@ const initialFitPreferences: FitPreferences = {
 };
 
 const labelOrder: BandLabel[] = ["reach", "target", "likely"];
+const moneyIncomeBands: Array<{ value: MoneyIncomeBand; label: string }> = [
+  { value: "overall", label: "Overall" },
+  { value: "0-30000", label: "< $30k" },
+  { value: "30001-48000", label: "$30-48k" },
+  { value: "48001-75000", label: "$48-75k" },
+  { value: "75001-110000", label: "$75-110k" },
+  { value: "110001-plus", label: "$110k+" },
+];
 const useLocalSchoolFixture =
   process.env.NEXT_PUBLIC_ADMIRA_USE_LOCAL_SCHOOL_FIXTURE === "true";
 const addedSchoolsStorageKey = "admira-added-schools";
@@ -1175,6 +1185,8 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
     useState<NarrativeStatus>("checking");
   const [compassStatus, setCompassStatus] =
     useState<CompassStatus>("checking");
+  const [moneyStatus, setMoneyStatus] =
+    useState<MoneyStatus>("checking");
   const [listBuilderStatus, setListBuilderStatus] = useState<
     "checking" | "enabled" | "disabled"
   >("checking");
@@ -1356,6 +1368,21 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
       }
     }
 
+    async function loadMoneyStatus() {
+      try {
+        const response = await fetch("/api/money/status");
+        const payload = await response.json();
+        if (!active) {
+          return;
+        }
+        setMoneyStatus(payload?.enabled === true ? "enabled" : "disabled");
+      } catch {
+        if (active) {
+          setMoneyStatus("disabled");
+        }
+      }
+    }
+
     async function loadListBuilderStatus() {
       try {
         const response = await fetch("/api/list/status");
@@ -1382,6 +1409,7 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
     void loadReportsStatus();
     void loadNarrativeStatus();
     void loadCompassStatus();
+    void loadMoneyStatus();
     void loadListBuilderStatus();
 
     return () => {
@@ -1601,6 +1629,7 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
     reports: reportsStatus,
     narrative: narrativeStatus,
     compass: compassStatus,
+    money: moneyStatus,
     fitFinder: fitFinderStatus,
   };
 
@@ -1668,6 +1697,7 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
                 climbStatus={climbStatus}
                 commandCenterStatus={commandCenterStatus}
                 reportsStatus={reportsStatus}
+                moneyStatus={moneyStatus}
                 schoolQuery={schoolQuery}
                 setSchoolQuery={setSchoolQuery}
                 schoolResults={schoolResults}
@@ -1740,6 +1770,7 @@ function AppSidebar({
     reports: ReportsStatus;
     narrative: NarrativeStatus;
     compass: CompassStatus;
+    money: MoneyStatus;
     fitFinder: FitFinderStatus;
   };
 }) {
@@ -1819,7 +1850,12 @@ function AppSidebar({
           Reports
         </NavItem>
       ) : null}
-      <NavItem href="/money" active={view === "money"} icon={<FileText size={17} />} badge="Soon">
+      <NavItem
+        href="/money"
+        active={view === "money"}
+        icon={<FileText size={17} />}
+        badge={statuses.money === "enabled" ? undefined : "Soon"}
+      >
         Money
       </NavItem>
 
@@ -1890,6 +1926,7 @@ function BottomTabBar({
     reports: ReportsStatus;
     narrative: NarrativeStatus;
     compass: CompassStatus;
+    money: MoneyStatus;
     fitFinder: FitFinderStatus;
   };
 }) {
@@ -2052,7 +2089,13 @@ function BottomTabBar({
                   Reports
                 </NavItem>
               ) : null}
-              <NavItem href="/money" active={view === "money"} icon={<FileText size={17} />} badge="Soon" onNavigate={() => setMoreOpen(false)}>
+              <NavItem
+                href="/money"
+                active={view === "money"}
+                icon={<FileText size={17} />}
+                badge={statuses.money === "enabled" ? undefined : "Soon"}
+                onNavigate={() => setMoreOpen(false)}
+              >
                 Money
               </NavItem>
               <div className="nav-grp">Account</div>
@@ -2105,6 +2148,7 @@ function RouteBody({
   climbStatus,
   commandCenterStatus,
   reportsStatus,
+  moneyStatus,
   schoolQuery,
   setSchoolQuery,
   schoolResults,
@@ -2130,6 +2174,7 @@ function RouteBody({
   climbStatus: ClimbStatus;
   commandCenterStatus: CommandCenterStatus;
   reportsStatus: ReportsStatus;
+  moneyStatus: MoneyStatus;
   schoolQuery: string;
   setSchoolQuery: Dispatch<SetStateAction<string>>;
   schoolResults: SchoolSearchRow[];
@@ -2273,7 +2318,15 @@ function RouteBody({
     );
   }
 
-  return <MoneyComingSoon />;
+  if (view === "money") {
+    return moneyStatus === "enabled" ? (
+      <MoneyPanel profile={profile} schools={addedSchools} />
+    ) : (
+      <FeatureUnavailable label="Money" />
+    );
+  }
+
+  return <FeatureUnavailable label="Module" />;
 }
 
 function ProfileGateCard() {
@@ -2817,20 +2870,350 @@ function FeatureUnavailable({ label }: { label: string }) {
   );
 }
 
-function MoneyComingSoon() {
+function defaultMoneyResidency(school: SchoolSearchRow): MoneyResidency {
+  return school.country === "CA" ? "domestic" : "out_of_state";
+}
+
+function formatMoneyFigure(
+  figure: MoneyPlan["figures"]["true_net_price"],
+  fallbackCurrency: "USD" | "CAD",
+) {
+  if (figure.value === null) {
+    return "N/A";
+  }
+  const currency = figure.currency ?? fallbackCurrency;
+  const prefix = currency === "CAD" ? "C$" : "$";
+  return `${prefix}${Math.round(figure.value).toLocaleString("en-US")}`;
+}
+
+function formatBasis(basis: "verified" | "estimate") {
+  return basis === "verified" ? "verified" : "estimate";
+}
+
+function MoneyBasisBadge({
+  figure,
+}: {
+  figure: MoneyPlan["figures"]["true_net_price"];
+}) {
   return (
-    <section className="route-card money-stub" data-testid="money-stub">
-      <div className="section-kicker">Coming soon</div>
-      <h3 className="section-title">Costs and aid are coming soon.</h3>
-      <p className="helper">
-        We&apos;re not showing net price, merit aid, or ROI yet. We&apos;ll add
-        them once the numbers are solid and worth trusting.
-      </p>
-      <div className="phase5-empty">
-        <CircleHelp size={18} aria-hidden="true" />
-        <span>No cost, scholarship, or ROI figures appear here yet.</span>
+    <a
+      className="money-basis"
+      data-basis={figure.basis}
+      href={figure.source_url}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {formatBasis(figure.basis)}
+    </a>
+  );
+}
+
+function MoneyPanel({ profile, schools }: { profile: Profile; schools: AddedSchool[] }) {
+  const readySchools = useMemo(
+    () => schools.filter((entry) => entry.status === "ready"),
+    [schools],
+  );
+  const [selectedUnitid, setSelectedUnitid] = useState<number | null>(null);
+  const [incomeBand, setIncomeBand] = useState<MoneyIncomeBand>("overall");
+  const [residency, setResidency] = useState<MoneyResidency>("out_of_state");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [plan, setPlan] = useState<MoneyPlan | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (readySchools.length === 0) {
+      setSelectedUnitid(null);
+      setPlan(null);
+      setStatus("idle");
+      return;
+    }
+    if (!readySchools.some((entry) => entry.school.unitid === selectedUnitid)) {
+      setSelectedUnitid(readySchools[0].school.unitid);
+    }
+  }, [readySchools, selectedUnitid]);
+
+  const selectedSchool = readySchools.find(
+    (entry) => entry.school.unitid === selectedUnitid,
+  )?.school;
+  const moneyProfile = useMemo(
+    () => ({
+      gpa: numberOrUndefined(profile.gpa),
+      sat_score: profile.notSubmittingTests
+        ? undefined
+        : numberOrUndefined(profile.sat),
+      act_score: profile.notSubmittingTests
+        ? undefined
+        : numberOrUndefined(profile.act),
+      canadian_average: numberOrUndefined(profile.canadianAverage),
+    }),
+    [
+      profile.gpa,
+      profile.sat,
+      profile.act,
+      profile.notSubmittingTests,
+      profile.canadianAverage,
+    ],
+  );
+
+  useEffect(() => {
+    if (!selectedSchool) {
+      return;
+    }
+    setResidency(defaultMoneyResidency(selectedSchool));
+    if (selectedSchool.country === "CA") {
+      setIncomeBand("overall");
+    }
+  }, [selectedSchool]);
+
+  useEffect(() => {
+    if (!selectedSchool) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadMoney() {
+      setStatus("loading");
+      setError("");
+      try {
+        const response = await fetch("/api/money", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            unitid: selectedSchool!.unitid,
+            income_band: selectedSchool!.country === "CA" ? "overall" : incomeBand,
+            residency,
+            profile: moneyProfile,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "Money request failed.");
+        }
+        if (active) {
+          setPlan(payload as MoneyPlan);
+          setStatus("ready");
+        }
+      } catch (caught) {
+        if (active) {
+          setPlan(null);
+          setStatus("error");
+          setError(caught instanceof Error ? caught.message : "Money request failed.");
+        }
+      }
+    }
+
+    void loadMoney();
+    return () => {
+      active = false;
+    };
+  }, [
+    selectedSchool,
+    incomeBand,
+    residency,
+    moneyProfile,
+  ]);
+
+  if (readySchools.length === 0) {
+    return (
+      <section className="route-card money-panel" data-testid="money-panel">
+        <div className="section-kicker">Money</div>
+        <h3 className="section-title">Add a school to price it out.</h3>
+        <p className="helper">
+          Money uses the schools you have already scored, then reloads sourced
+          cost and scholarship rows on the server.
+        </p>
+        <Link className="add-button route-card-action" href="/schools">
+          Find schools
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="route-card money-panel" data-testid="money-panel">
+      <div className="money-panel-head">
+        <div>
+          <div className="section-kicker">Money</div>
+          <h3 className="section-title">Net price and payoff.</h3>
+        </div>
+        {status === "loading" ? <Loader2 className="spin" size={18} /> : null}
       </div>
+
+      <div className="money-controls" aria-label="Money controls">
+        <div className="money-control-group">
+          <span className="micro-label">School</span>
+          <div className="money-button-row">
+            {readySchools.map((entry) => (
+              <button
+                key={entry.school.unitid}
+                type="button"
+                className="money-choice"
+                data-active={entry.school.unitid === selectedUnitid}
+                onClick={() => {
+                  setSelectedUnitid(entry.school.unitid);
+                  setResidency(defaultMoneyResidency(entry.school));
+                  if (entry.school.country === "CA") {
+                    setIncomeBand("overall");
+                  }
+                }}
+                data-testid="money-school"
+              >
+                {entry.school.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {selectedSchool?.country === "US" ? (
+          <div className="money-control-group">
+            <span className="micro-label">Income band</span>
+            <div className="money-band-grid">
+              {moneyIncomeBands.map((band) => (
+                <button
+                  key={band.value}
+                  type="button"
+                  className="money-choice"
+                  data-active={incomeBand === band.value}
+                  onClick={() => setIncomeBand(band.value)}
+                  data-testid="money-income-band"
+                >
+                  {band.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="money-control-group">
+          <span className="micro-label">Residency</span>
+          <div className="money-button-row">
+            {(selectedSchool?.country === "CA"
+              ? [{ value: "domestic" as const, label: "Domestic" }]
+              : [
+                  { value: "out_of_state" as const, label: "Out of state" },
+                  { value: "in_state" as const, label: "In state" },
+                ]
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="money-choice"
+                data-active={residency === option.value}
+                onClick={() => setResidency(option.value)}
+                data-testid="money-residency"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {status === "error" ? (
+        <div className="phase5-empty money-error" role="alert">
+          <AlertTriangle size={18} aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {plan ? <MoneyPlanView plan={plan} /> : null}
     </section>
+  );
+}
+
+function MoneyPlanView({ plan }: { plan: MoneyPlan }) {
+  const figures = plan.figures;
+  return (
+    <div className="money-result" data-testid="money-result">
+      <div className="money-hero-price">
+        <span className="micro-label">Net price</span>
+        <strong className="mono" data-testid="money-net-price">
+          {formatMoneyFigure(figures.true_net_price, plan.currency)}
+        </strong>
+        <MoneyBasisBadge figure={figures.true_net_price} />
+      </div>
+
+      <div className="money-formula" aria-label="Net price formula">
+        <MoneyFormulaRow label="Sticker" figure={figures.sticker_price} currency={plan.currency} />
+        <MoneyFormulaRow label="Need aid" figure={figures.need_aid} currency={plan.currency} />
+        <MoneyFormulaRow label="Merit" figure={figures.merit} currency={plan.currency} testId="money-merit" />
+        <MoneyFormulaRow label="Net" figure={figures.true_net_price} currency={plan.currency} />
+      </div>
+
+      <div className="money-roi-grid" data-testid="money-roi">
+        <div className="money-metric">
+          <span>4-year net cost</span>
+          <strong className="mono">
+            {formatMoneyFigure(figures.four_year_net_cost, plan.currency)}
+          </strong>
+          <MoneyBasisBadge figure={figures.four_year_net_cost} />
+        </div>
+        <div className="money-metric">
+          <span>Gross payback</span>
+          <strong className="mono">
+            {figures.payback_years.value === null
+              ? "N/A"
+              : `${figures.payback_years.value} yrs`}
+          </strong>
+          <MoneyBasisBadge figure={figures.payback_years} />
+        </div>
+        <div className="money-metric">
+          <span>10-year earnings</span>
+          <strong className="mono">
+            {formatMoneyFigure(figures.median_earnings_10yr, plan.currency)}
+          </strong>
+          <MoneyBasisBadge figure={figures.median_earnings_10yr} />
+        </div>
+      </div>
+
+      <div className="money-merit-note">
+        {plan.merit.matched ? (
+          <>
+            <Check size={16} aria-hidden="true" />
+            <span>
+              {plan.merit.scholarship_name} matched from the published merit table.
+            </span>
+          </>
+        ) : (
+          <>
+            <CircleHelp size={16} aria-hidden="true" />
+            <span>No published automatic merit rule matched this profile.</span>
+          </>
+        )}
+      </div>
+
+      <div className="money-sources">
+        <span className="micro-label">Sources</span>
+        <div>
+          {plan.sources.map((source) => (
+            <a key={source} href={source} target="_blank" rel="noreferrer">
+              Source
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoneyFormulaRow({
+  label,
+  figure,
+  currency,
+  testId,
+}: {
+  label: string;
+  figure: MoneyPlan["figures"]["true_net_price"];
+  currency: "USD" | "CAD";
+  testId?: string;
+}) {
+  return (
+    <div className="money-formula-row" data-testid={testId}>
+      <span>{label}</span>
+      <strong className="mono">{formatMoneyFigure(figure, currency)}</strong>
+      <MoneyBasisBadge figure={figure} />
+    </div>
   );
 }
 

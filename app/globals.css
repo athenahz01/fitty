@@ -1226,6 +1226,212 @@ button {
   gap: 14px;
 }
 
+.money-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.money-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.money-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.money-control-group {
+  display: grid;
+  gap: 8px;
+}
+
+.money-button-row,
+.money-band-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.money-band-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.money-choice {
+  min-height: 40px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  background: var(--control-bg);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 9px 12px;
+  text-align: left;
+  transition-property: background-color, border-color, color, scale, box-shadow;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-out-quart);
+}
+
+.money-choice:hover {
+  border-color: var(--rule-strong);
+  box-shadow: var(--elev-1);
+}
+
+.money-choice:active {
+  scale: 0.96;
+}
+
+.money-choice[data-active="true"] {
+  border-color: color-mix(in srgb, var(--fit-teal) 42%, transparent);
+  background: var(--fit-wash);
+  color: var(--fit-ink);
+}
+
+.money-result {
+  display: grid;
+  gap: 16px;
+}
+
+.money-hero-price {
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  border-radius: var(--r-panel);
+  background: var(--rail-bg);
+  color: var(--sigil-on);
+  padding: 20px;
+}
+
+.money-hero-price .micro-label {
+  color: color-mix(in srgb, var(--sigil-on) 72%, transparent);
+}
+
+.money-hero-price strong {
+  color: var(--rail-accent);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 46px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.money-basis {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 28px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--font-data), monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 4px 9px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.money-basis[data-basis="verified"] {
+  border-color: color-mix(in srgb, var(--fit-green) 34%, transparent);
+  background: var(--likely-wash);
+  color: var(--fit-ink);
+}
+
+.money-basis[data-basis="estimate"] {
+  border-color: color-mix(in srgb, var(--caution-orange) 34%, transparent);
+  background: var(--chance-wash);
+  color: var(--chance-ink);
+}
+
+.money-formula,
+.money-roi-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.money-roi-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.money-formula-row,
+.money-metric {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  border-radius: var(--r-inner);
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.money-formula-row span,
+.money-metric span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.money-formula-row strong,
+.money-metric strong {
+  color: var(--ink);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.money-merit-note,
+.money-sources {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: var(--r-inner);
+  background: var(--plain-card);
+  box-shadow: var(--elev-1);
+  padding: 12px;
+}
+
+.money-merit-note svg {
+  flex: none;
+  color: var(--fit-teal);
+  margin-top: 1px;
+}
+
+.money-sources {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.money-sources > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.money-sources a {
+  min-height: 30px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.money-error {
+  background: var(--error-wash);
+  color: var(--error);
+}
+
 .copilot-layer {
   pointer-events: none;
 }
@@ -5696,6 +5902,23 @@ button {
 }
 
 @media (max-width: 760px) {
+  .money-formula,
+  .money-roi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .money-hero-price strong {
+    font-size: 36px;
+  }
+
+  .money-sources {
+    display: grid;
+  }
+
+  .money-sources > div {
+    justify-content: flex-start;
+  }
+
   .bottom-tabs {
     position: fixed;
     left: 0;

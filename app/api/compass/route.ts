@@ -11,6 +11,15 @@ import {
 } from "@/lib/compass/schema";
 import { compassEnabled, majorSimilarities } from "@/lib/compass/server";
 import type { InferenceSchool } from "@/lib/model/inference";
+import {
+  assertMoneyLineage,
+  buildMoneyPlan,
+  type MoneyMeritRule,
+  type MoneyNetPriceRow,
+  type MoneyPlan,
+  type MoneySchool,
+} from "@/lib/money";
+import { moneyEnabled } from "@/lib/money/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -22,7 +31,7 @@ const RATE_WINDOW_MS = 60_000;
 const rateBuckets = new Map<string, RateBucket>();
 
 const SCHOOL_COLUMNS =
-  "unitid,name,setting,size,admit_rate,ed_admit_rate,rd_admit_rate,sat_25,sat_75,act_25,act_75,gpa_avg,test_policy,c7_factors,selectivity_tier";
+  "unitid,name,country,setting,size,admit_rate,ed_admit_rate,rd_admit_rate,sat_25,sat_75,act_25,act_75,gpa_avg,test_policy,c7_factors,selectivity_tier";
 
 function requesterKey(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -114,6 +123,7 @@ export async function POST(request: Request) {
   const careers = (careersResult.data ?? []) as CompassCareer[];
 
   let school: InferenceSchool | undefined;
+  let money: MoneyPlan | undefined;
   if (parsed.data.unitid !== undefined) {
     const { data, error } = await supabase
       .from("schools")
@@ -128,6 +138,101 @@ export async function POST(request: Request) {
     }
     if (data) {
       school = data as unknown as InferenceSchool;
+
+      if (moneyEnabled()) {
+        const [meritResult, netPriceResult] = await Promise.all([
+          supabase
+            .from("money_merit_rules")
+            .select(
+              [
+                "rule_id",
+                "unitid",
+                "school_name",
+                "country",
+                "scholarship_name",
+                "residency",
+                "currency",
+                "amount_basis",
+                "annual_amount",
+                "total_value",
+                "renewable_years",
+                "gpa_min",
+                "gpa_max",
+                "sat_min",
+                "sat_max",
+                "act_min",
+                "act_max",
+                "percentage_min",
+                "percentage_max",
+                "priority",
+                "source_url",
+                "provenance",
+                "notes",
+              ].join(","),
+            )
+            .eq("unitid", parsed.data.unitid),
+          supabase
+            .from("money_net_price_bands")
+            .select(
+              [
+                "unitid",
+                "school_name",
+                "country",
+                "residency",
+                "income_band",
+                "currency",
+                "sticker_price",
+                "net_price",
+                "median_earnings_10yr",
+                "basis",
+                "earnings_basis",
+                "source_url",
+                "earnings_source_url",
+                "source_year",
+                "provenance",
+                "notes",
+              ].join(","),
+            )
+            .eq("unitid", parsed.data.unitid),
+        ]);
+
+        if (meritResult.error || netPriceResult.error) {
+          return NextResponse.json(
+            { error: "Unable to load money reference data for ROI." },
+            { status: 500 },
+          );
+        }
+
+        const moneyNetRows = (netPriceResult.data ?? []) as unknown as MoneyNetPriceRow[];
+        if (moneyNetRows.length > 0) {
+          const moneyMeritRules = (meritResult.data ?? []) as unknown as MoneyMeritRule[];
+          try {
+            assertMoneyLineage({
+              merit_rules: moneyMeritRules,
+              net_price_bands: moneyNetRows,
+            });
+            const moneySchool = data as unknown as MoneySchool;
+            money = buildMoneyPlan({
+              school: moneySchool,
+              profile: parsed.data.profile ?? {},
+              meritRules: moneyMeritRules,
+              netPriceRows: moneyNetRows,
+              incomeBand: "overall",
+              residency: moneySchool.country === "CA" ? "domestic" : "out_of_state",
+            });
+          } catch (error) {
+            return NextResponse.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Money reference data failed lineage validation.",
+              },
+              { status: 500 },
+            );
+          }
+        }
+      }
     }
   }
 
@@ -150,6 +255,7 @@ export async function POST(request: Request) {
     majorSimilarity: similarity,
     school,
     profile: parsed.data.profile,
+    money,
   });
 
   return NextResponse.json(result);

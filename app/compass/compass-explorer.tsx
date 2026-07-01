@@ -3,7 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type SourcedFigure = { value: number | null; source_url: string };
+type SourcedFigure = {
+  value: number | null;
+  source_url: string;
+  basis?: "verified" | "estimate";
+  currency?: "USD" | "CAD";
+};
+
+type CompassRoi =
+  | { available: false; note: string }
+  | {
+      available: true;
+      net_price: SourcedFigure;
+      four_year_net_cost: SourcedFigure;
+      payback_years: SourcedFigure;
+      earnings_to_cost_ratio: SourcedFigure;
+      sources: string[];
+    };
 
 type CompassMajorView = {
   major_name: string;
@@ -15,20 +31,28 @@ type CompassMajorView = {
     median_wage_annual: SourcedFigure;
     onet_code: string | null;
   }[];
-  roi: { available: boolean; note: string };
+  roi: CompassRoi;
 };
 
 type CompassResult = {
   admit: { school_name: string; tier: string; score: number } | null;
   majors: CompassMajorView[];
-  roi: { available: boolean; note: string };
+  roi: CompassRoi;
   sources: string[];
 };
 
 type Status = "checking" | "disabled" | "ready";
 
-function money(value: number | null) {
-  return value === null ? null : `$${Math.round(value).toLocaleString("en-US")}`;
+function money(value: number | null, currency: "USD" | "CAD" = "USD") {
+  if (value === null) {
+    return null;
+  }
+  const prefix = currency === "CAD" ? "C$" : "$";
+  return `${prefix}${Math.round(value).toLocaleString("en-US")}`;
+}
+
+function basisLabel(figure: SourcedFigure) {
+  return figure.basis === "verified" ? "verified source" : "estimate";
 }
 
 export function CompassExplorer() {
@@ -200,12 +224,68 @@ export function CompassExplorer() {
             </div>
           ) : null}
 
-          <div
-            className="mt-4 rounded-xl border border-dashed border-black/20 p-4 text-sm opacity-80 dark:border-white/20"
-            data-testid="compass-roi-stub"
-          >
-            ROI &amp; net price are coming with the Money module. {result.roi.note}
-          </div>
+          {result.roi.available ? (
+            <div
+              className="mt-4 rounded-xl border border-black/10 p-4 text-sm dark:border-white/10"
+              data-testid="compass-roi"
+            >
+              <div className="text-xs uppercase tracking-wide opacity-60">
+                Money-linked ROI
+              </div>
+              <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <div className="opacity-60">Net price</div>
+                  <a
+                    className="text-xl font-bold underline"
+                    href={result.roi.net_price.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {money(
+                      result.roi.net_price.value,
+                      result.roi.net_price.currency,
+                    )}
+                  </a>
+                  <div className="mt-1 text-xs opacity-50">
+                    {basisLabel(result.roi.net_price)}
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-60">4-year net cost</div>
+                  <div className="text-xl font-bold">
+                    {money(
+                      result.roi.four_year_net_cost.value,
+                      result.roi.four_year_net_cost.currency,
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs opacity-50">
+                    {basisLabel(result.roi.four_year_net_cost)}
+                  </div>
+                </div>
+                <div>
+                  <div className="opacity-60">Gross payback</div>
+                  <a
+                    className="text-xl font-bold underline"
+                    href={result.roi.payback_years.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {result.roi.payback_years.value} years
+                  </a>
+                  <div className="mt-1 text-xs opacity-50">
+                    {basisLabel(result.roi.payback_years)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="mt-4 rounded-xl border border-dashed border-black/20 p-4 text-sm opacity-80 dark:border-white/20"
+              data-testid="compass-roi-stub"
+            >
+              ROI &amp; net price are in Money. {result.roi.note}
+            </div>
+          )}
 
           {result.majors.length === 0 ? (
             <p className="mt-6 text-sm opacity-70" data-testid="compass-empty">

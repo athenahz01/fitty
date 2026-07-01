@@ -236,6 +236,61 @@ export type CompassCareerRow = {
   ingested_at: string;
 };
 
+export type MoneyMeritRuleRow = {
+  id: string;
+  rule_id: string;
+  unitid: number;
+  school_name: string;
+  country: Country;
+  scholarship_name: string;
+  residency: "any" | "in_state" | "out_of_state" | "domestic" | "international";
+  currency: "USD" | "CAD";
+  amount_basis: "verified" | "estimate";
+  annual_amount: number;
+  total_value: number | null;
+  renewable_years: number | null;
+  gpa_min: number | null;
+  gpa_max: number | null;
+  sat_min: number | null;
+  sat_max: number | null;
+  act_min: number | null;
+  act_max: number | null;
+  percentage_min: number | null;
+  percentage_max: number | null;
+  priority: number;
+  source_url: string;
+  provenance: "curated_public";
+  notes: string | null;
+  ingested_at: string;
+};
+
+export type MoneyNetPriceBandRow = {
+  id: string;
+  unitid: number;
+  school_name: string;
+  country: Country;
+  residency: "any" | "in_state" | "out_of_state" | "domestic" | "international";
+  income_band:
+    | "0-30000"
+    | "30001-48000"
+    | "48001-75000"
+    | "75001-110000"
+    | "110001-plus"
+    | "overall";
+  currency: "USD" | "CAD";
+  sticker_price: number;
+  net_price: number;
+  median_earnings_10yr: number | null;
+  basis: "verified" | "estimate";
+  earnings_basis: "verified" | "estimate" | null;
+  source_url: string;
+  earnings_source_url: string | null;
+  source_year: string | null;
+  provenance: "college_scorecard_api" | "curated_public";
+  notes: string | null;
+  ingested_at: string;
+};
+
 export type ReportShareRow = {
   id: string;
   subject_id: string;
@@ -264,6 +319,24 @@ export type Database = {
           ingested_at?: string;
         };
         Update: Partial<Omit<CompassCareerRow, "id">>;
+        Relationships: [];
+      };
+      money_merit_rules: {
+        Row: MoneyMeritRuleRow;
+        Insert: Omit<MoneyMeritRuleRow, "id" | "ingested_at"> & {
+          id?: string;
+          ingested_at?: string;
+        };
+        Update: Partial<Omit<MoneyMeritRuleRow, "id">>;
+        Relationships: [];
+      };
+      money_net_price_bands: {
+        Row: MoneyNetPriceBandRow;
+        Insert: Omit<MoneyNetPriceBandRow, "id" | "ingested_at"> & {
+          id?: string;
+          ingested_at?: string;
+        };
+        Update: Partial<Omit<MoneyNetPriceBandRow, "id">>;
         Relationships: [];
       };
       report_shares: {

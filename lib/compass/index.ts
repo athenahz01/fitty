@@ -8,19 +8,31 @@
 //   the assembler computes NO salary and invents nothing. A missing figure is
 //   reported as null, never fabricated.
 // * Admit odds come from the Phase 1 scorer, not from any major-level guess.
-// * ROI / net-cost is a clearly-labeled DEFERRED STUB (Money is Phase 4). There
-//   is no placeholder ROI number anywhere.
+// * ROI / net-cost comes from the Money module only when a sourced Money plan is
+//   supplied; otherwise Compass keeps the number-free stub.
 
 import { buildUsAdmitIntelligence } from "../score/us";
 import type { InferenceSchool } from "../model/inference";
+import type { MoneyFigure, MoneyPlan } from "../money";
 
 export const COMPASS_METHOD = "compass_major_career_v1";
 
-// The deferred ROI stub. No number — ever — until the Money module lands.
+// The fallback ROI stub. No number is shown unless Money supplies a plan.
 export const ROI_STUB = {
   available: false as const,
-  note: "ROI arrives with the Money module (Phase 4). No net-price or return figure is shown yet.",
+  note: "Open Money to see sourced net price and payback. No return figure is shown here yet.",
 };
+
+export type CompassRoi =
+  | typeof ROI_STUB
+  | {
+      available: true;
+      net_price: MoneyFigure;
+      four_year_net_cost: MoneyFigure;
+      payback_years: MoneyFigure;
+      earnings_to_cost_ratio: MoneyFigure;
+      sources: string[];
+    };
 
 export type CompassMajor = {
   major_name: string;
@@ -55,7 +67,7 @@ export type CompassMajorView = {
   reason: string;
   median_earnings_10yr: SourcedFigure;
   careers: CompassCareerView[];
-  roi: typeof ROI_STUB;
+  roi: CompassRoi;
 };
 
 export type CompassAdmit = {
@@ -70,7 +82,7 @@ export type CompassResult = {
   method: typeof COMPASS_METHOD;
   admit: CompassAdmit | null;
   majors: CompassMajorView[];
-  roi: typeof ROI_STUB;
+  roi: CompassRoi;
   sources: string[];
 };
 
@@ -183,6 +195,20 @@ function admitFor(
   };
 }
 
+function roiFromMoney(money: MoneyPlan | undefined): CompassRoi {
+  if (!money || !money.roi.available) {
+    return ROI_STUB;
+  }
+  return {
+    available: true,
+    net_price: money.figures.true_net_price,
+    four_year_net_cost: money.figures.four_year_net_cost,
+    payback_years: money.figures.payback_years,
+    earnings_to_cost_ratio: money.figures.earnings_to_cost_ratio,
+    sources: money.sources,
+  };
+}
+
 export function generateCompass(input: {
   majors: CompassMajor[];
   careers: CompassCareer[];
@@ -197,6 +223,7 @@ export function generateCompass(input: {
     gpa?: number;
     application_round?: "regular" | "early";
   };
+  money?: MoneyPlan;
 }): CompassResult {
   const careersByMajor = new Map<string, CompassCareer[]>();
   for (const career of input.careers) {
@@ -206,6 +233,12 @@ export function generateCompass(input: {
   }
 
   const sources = new Set<string>();
+  const roi = roiFromMoney(input.money);
+  if (roi.available) {
+    for (const source of roi.sources) {
+      sources.add(source);
+    }
+  }
 
   const majors: CompassMajorView[] = input.majors
     .map((major) => {
@@ -245,7 +278,7 @@ export function generateCompass(input: {
           source_url: major.source_url,
         },
         careers,
-        roi: ROI_STUB,
+        roi,
       };
     })
     .sort((left, right) => {
@@ -261,7 +294,7 @@ export function generateCompass(input: {
     method: COMPASS_METHOD,
     admit: admitFor(input.school, input.profile),
     majors,
-    roi: ROI_STUB,
+    roi,
     sources: [...sources].sort((left, right) => left.localeCompare(right)),
   };
 }

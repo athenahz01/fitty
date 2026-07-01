@@ -7,6 +7,7 @@ import {
   type CompassCareer,
   type CompassMajor,
 } from "../index";
+import { buildMoneyPlan } from "../../money";
 import { buildUsAdmitIntelligence } from "../../score/us";
 
 const school = {
@@ -98,9 +99,51 @@ describe("Compass assembler", () => {
     // No ROI figure: no currency, percentage, or multi-digit return number.
     expect(compass.roi.note).not.toMatch(/[$%]/);
     expect(compass.roi.note).not.toMatch(/\d{2,}/);
-    expect(compass.roi.note.toLowerCase()).toContain("money module");
+    expect(compass.roi.note.toLowerCase()).toContain("open money");
     for (const major of compass.majors) {
       expect(major.roi.available).toBe(false);
+    }
+  });
+
+  it("uses sourced Money ROI when a money plan is supplied", () => {
+    const money = buildMoneyPlan({
+      school: {
+        unitid: 100751,
+        name: "The University of Alabama",
+        country: "US",
+      },
+      profile: { gpa: 3.7, sat_score: 1200 },
+      meritRules: [],
+      netPriceRows: [
+        {
+          unitid: 100751,
+          school_name: "The University of Alabama",
+          country: "US",
+          residency: "any",
+          income_band: "overall",
+          currency: "USD",
+          sticker_price: 30000,
+          net_price: 20000,
+          median_earnings_10yr: 60000,
+          basis: "verified",
+          earnings_basis: "verified",
+          source_url: "https://collegescorecard.ed.gov/data/",
+          earnings_source_url: "https://collegescorecard.ed.gov/data/",
+          source_year: "test",
+          provenance: "college_scorecard_api",
+        },
+      ],
+    });
+
+    const compass = generateCompass({ majors, careers, money });
+    expect(compass.roi.available).toBe(true);
+    if (compass.roi.available) {
+      expect(compass.roi.net_price.value).toBe(20000);
+      expect(compass.roi.payback_years.value).toBe(1.3);
+      expect(compass.sources).toContain("https://collegescorecard.ed.gov/data/");
+    }
+    for (const major of compass.majors) {
+      expect(major.roi.available).toBe(true);
     }
   });
 

@@ -642,6 +642,15 @@ async function mockReportsStatus(page: Page, enabled: boolean) {
   });
 }
 
+async function mockMoneyStatus(page: Page, enabled: boolean) {
+  await page.route("**/api/money/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ enabled }),
+    });
+  });
+}
+
 async function mockListStatus(page: Page, enabled: boolean) {
   await page.route("**/api/list/status", async (route) => {
     await route.fulfill({
@@ -939,12 +948,180 @@ test("splits each route to one job with a profile spine everywhere but /start", 
   await expect(page.getByLabel("GPA")).toHaveCount(0);
 });
 
+test("renders sourced Money figures when the Money flag is enabled", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await mockMoneyStatus(page, true);
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "admira-profile",
+      JSON.stringify({
+        gpa: "3.95",
+        canadianAverage: "92",
+        sat: "1420",
+        act: "",
+        notSubmittingTests: false,
+        intendedMajor: "Computer science",
+        applicationRound: "regular",
+        homeState: "NY",
+        activityNote: "",
+        completedPrerequisites: "ENG4U, MHF4U, MCV4U",
+      }),
+    );
+    window.localStorage.setItem(
+      "admira-added-schools",
+      JSON.stringify([
+        {
+          school: {
+            unitid: 100751,
+            name: "The University of Alabama",
+            state: "AL",
+            province_state: "AL",
+            country: "US",
+            selectivity_tier: "accessible",
+            sat_25: 1170,
+            sat_75: 1400,
+            act_25: 24,
+            act_75: 31,
+            test_policy: "optional",
+          },
+          status: "ready",
+        },
+      ]),
+    );
+  });
+
+  await page.route("**/api/money", async (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    expect(body).toMatchObject({
+      unitid: 100751,
+      residency: "out_of_state",
+      profile: {
+        gpa: 3.95,
+        sat_score: 1420,
+        canadian_average: 92,
+      },
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        method: "admira_money_v1",
+        school: {
+          unitid: 100751,
+          name: "The University of Alabama",
+          country: "US",
+        },
+        income_band: "75001-110000",
+        residency: "out_of_state",
+        currency: "USD",
+        figures: {
+          sticker_price: {
+            value: 33382,
+            basis: "verified",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          baseline_net_price: {
+            value: 25658,
+            basis: "verified",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          need_aid: {
+            value: 0,
+            basis: "estimate",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          merit: {
+            value: 28000,
+            basis: "verified",
+            currency: "USD",
+            source_url: "https://afford.ua.edu/scholarships/out-of-state-freshman/",
+          },
+          true_net_price: {
+            value: 5382,
+            basis: "estimate",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          four_year_net_cost: {
+            value: 21528,
+            basis: "estimate",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          median_earnings_10yr: {
+            value: 59221,
+            basis: "verified",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          payback_years: {
+            value: 0.4,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          earnings_to_cost_ratio: {
+            value: 11,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+        },
+        merit: {
+          matched: true,
+          scholarship_name: "Presidential",
+          rule_id: "ua-oos-presidential-2026",
+          source_url: "https://afford.ua.edu/scholarships/out-of-state-freshman/",
+          notes: null,
+        },
+        roi: {
+          available: true,
+          payback_years: {
+            value: 0.4,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          earnings_to_cost_ratio: {
+            value: 11,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          median_earnings_10yr: {
+            value: 59221,
+            basis: "verified",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+        },
+        sources: [
+          "https://afford.ua.edu/scholarships/out-of-state-freshman/",
+          "https://collegescorecard.ed.gov/data/",
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/money");
+  await expect(page.getByTestId("money-panel")).toBeVisible();
+  await expect(page.getByTestId("money-net-price")).toContainText("$5,382");
+  await expect(page.getByTestId("money-merit")).toContainText("$28,000");
+  await expect(page.getByTestId("money-roi")).toContainText("0.4 yrs");
+  await expect(page.getByText(/Presidential matched/)).toBeVisible();
+  await expect(page.getByText("estimate").first()).toBeVisible();
+});
+
 test("never shows the words honest or confident in user-facing copy", async ({
   page,
 }) => {
   await mockOutcomeStatus(page, false);
   await mockFitStatus(page, false);
   await mockAdmitIntelligenceStatus(page, false);
+  await mockMoneyStatus(page, false);
 
   const routes = [
     "/",

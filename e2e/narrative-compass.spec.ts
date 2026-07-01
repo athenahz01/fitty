@@ -115,7 +115,7 @@ test("essay studio stays dark when the flag is off", async ({ page }) => {
   await expect(page.getByTestId("essay-studio")).toHaveCount(0);
 });
 
-test("compass explorer shows sourced earnings, real admit odds, and the ROI stub", async ({
+test("compass explorer shows sourced earnings, real admit odds, and Money ROI", async ({
   page,
 }) => {
   await page.route("**/api/compass/status", (route) =>
@@ -156,10 +156,60 @@ test("compass explorer shows sourced earnings, real admit odds, and the ROI stub
                 onet_code: "15-1252.00",
               },
             ],
-            roi: { available: false, note: "ROI arrives with the Money module (Phase 4)." },
+            roi: {
+              available: true,
+              net_price: {
+                value: 18000,
+                basis: "estimate",
+                currency: "USD",
+                source_url: "https://collegescorecard.ed.gov/data/",
+              },
+              four_year_net_cost: {
+                value: 72000,
+                basis: "estimate",
+                currency: "USD",
+                source_url: "https://collegescorecard.ed.gov/data/",
+              },
+              payback_years: {
+                value: 0.6,
+                basis: "estimate",
+                source_url: "https://collegescorecard.ed.gov/data/",
+              },
+              earnings_to_cost_ratio: {
+                value: 6.22,
+                basis: "estimate",
+                source_url: "https://collegescorecard.ed.gov/data/",
+              },
+              sources: ["https://collegescorecard.ed.gov/data/"],
+            },
           },
         ],
-        roi: { available: false, note: "ROI arrives with the Money module (Phase 4)." },
+        roi: {
+          available: true,
+          net_price: {
+            value: 18000,
+            basis: "estimate",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          four_year_net_cost: {
+            value: 72000,
+            basis: "estimate",
+            currency: "USD",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          payback_years: {
+            value: 0.6,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          earnings_to_cost_ratio: {
+            value: 6.22,
+            basis: "estimate",
+            source_url: "https://collegescorecard.ed.gov/data/",
+          },
+          sources: ["https://collegescorecard.ed.gov/data/"],
+        },
         sources: [
           "https://collegescorecard.ed.gov/fields/cs",
           "https://www.onetonline.org/link/summary/15-1252.00",
@@ -177,8 +227,8 @@ test("compass explorer shows sourced earnings, real admit odds, and the ROI stub
   await expect(page.getByTestId("compass-major")).toContainText("Computer Science");
   await expect(page.getByTestId("compass-major")).toContainText("$112,000");
   await expect(page.getByTestId("compass-major")).toContainText("Software Developer");
-  // ROI is a labeled stub, no number.
-  const roi = page.getByTestId("compass-roi-stub");
-  await expect(roi).toContainText("Money module");
-  await expect(roi).not.toContainText("$");
+  const roi = page.getByTestId("compass-roi");
+  await expect(roi).toContainText("Money-linked ROI");
+  await expect(roi).toContainText("$18,000");
+  await expect(roi).toContainText("0.6 years");
 });

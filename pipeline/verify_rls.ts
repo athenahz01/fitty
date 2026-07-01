@@ -239,6 +239,8 @@ async function main() {
   let requirementStatusId = "";
   let documentId = "";
   let reportShareId = "";
+  let moneyMeritRuleId = "";
+  let moneyNetPriceBandId = "";
   let fatalError: Error | null = null;
   let cleanupFailed = false;
 
@@ -327,6 +329,95 @@ async function main() {
         });
       },
     );
+
+    const moneyMeritRule = await insertSingle(serviceDb, "money_merit_rules", {
+      rule_id: `rls-money-merit-${runId}`,
+      unitid: testUnitid,
+      school_name: `Admira RLS Harness ${runId}`,
+      country: "US",
+      scholarship_name: "RLS harness merit",
+      residency: "any",
+      currency: "USD",
+      amount_basis: "verified",
+      annual_amount: 100,
+      gpa_min: 3,
+      source_url: "https://example.com/admira-rls-harness",
+      provenance: "curated_public",
+    });
+    moneyMeritRuleId = String(moneyMeritRule.id);
+
+    const moneyNetPriceBand = await insertSingle(serviceDb, "money_net_price_bands", {
+      unitid: testUnitid,
+      school_name: `Admira RLS Harness ${runId}`,
+      country: "US",
+      residency: "any",
+      income_band: "overall",
+      currency: "USD",
+      sticker_price: 1000,
+      net_price: 900,
+      median_earnings_10yr: 60000,
+      basis: "verified",
+      earnings_basis: "verified",
+      source_url: "https://example.com/admira-rls-harness",
+      earnings_source_url: "https://example.com/admira-rls-harness",
+      provenance: "college_scorecard_api",
+    });
+    moneyNetPriceBandId = String(moneyNetPriceBand.id);
+
+    await runCheck(results, "Anonymous can read money merit reference rows", async () => {
+      const rows = await selectById(anonymousDb, "money_merit_rules", moneyMeritRuleId);
+      if (rows.length !== 1) {
+        throw new Error(`expected 1 row, got ${rows.length}`);
+      }
+    });
+
+    await runCheck(
+      results,
+      "Anonymous can read money net-price reference rows",
+      async () => {
+        const rows = await selectById(
+          anonymousDb,
+          "money_net_price_bands",
+          moneyNetPriceBandId,
+        );
+        if (rows.length !== 1) {
+          throw new Error(`expected 1 row, got ${rows.length}`);
+        }
+      },
+    );
+
+    await runCheck(results, "Anonymous cannot insert money merit rows", async () => {
+      await expectRejected(anonymousDb, "money_merit_rules", {
+        rule_id: `anon-money-merit-${runId}`,
+        unitid: testUnitid,
+        school_name: `Admira RLS Harness ${runId}`,
+        country: "US",
+        scholarship_name: "Blocked anonymous merit",
+        residency: "any",
+        currency: "USD",
+        amount_basis: "verified",
+        annual_amount: 100,
+        gpa_min: 3,
+        source_url: "https://example.com/admira-rls-harness",
+        provenance: "curated_public",
+      });
+    });
+
+    await runCheck(results, "Anonymous cannot insert money net-price rows", async () => {
+      await expectRejected(anonymousDb, "money_net_price_bands", {
+        unitid: testUnitid,
+        school_name: `Admira RLS Harness ${runId}`,
+        country: "US",
+        residency: "in_state",
+        income_band: "overall",
+        currency: "USD",
+        sticker_price: 1000,
+        net_price: 900,
+        basis: "verified",
+        source_url: "https://example.com/admira-rls-harness",
+        provenance: "college_scorecard_api",
+      });
+    });
 
     await runCheck(results, "Anonymous cannot insert command-center tasks", async () => {
       await expectRejected(anonymousDb, "tasks", {
@@ -953,6 +1044,29 @@ async function main() {
     } catch (error) {
       cleanupErrors.push(
         error instanceof Error ? error.message : "program_requirements delete failed",
+      );
+    }
+    try {
+      if (moneyNetPriceBandId) {
+        await deleteByColumn(
+          serviceDb,
+          "money_net_price_bands",
+          "unitid",
+          testUnitid,
+        );
+      }
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error ? error.message : "money_net_price_bands delete failed",
+      );
+    }
+    try {
+      if (moneyMeritRuleId) {
+        await deleteByColumn(serviceDb, "money_merit_rules", "unitid", testUnitid);
+      }
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error ? error.message : "money_merit_rules delete failed",
       );
     }
     try {
