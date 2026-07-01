@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Loader2,
   MapPin,
+  Menu,
   MessageCircle,
   Moon,
   Plus,
@@ -1683,6 +1684,13 @@ export function AdmiraApp({ view = "dashboard" }: { view?: AdmiraView }) {
           </section>
         </div>
 
+        <BottomTabBar
+          view={view}
+          profile={profile}
+          readiness={profileReadiness(profile)}
+          statuses={appStatuses}
+        />
+
         {copilotStatus === "enabled" ? (
           <CopilotDrawer
             open={isCopilotOpen}
@@ -1839,19 +1847,223 @@ function NavItem({
   icon,
   badge,
   children,
+  onNavigate,
 }: {
   href: string;
   active: boolean;
   icon: ReactNode;
   badge?: string;
   children: ReactNode;
+  onNavigate?: () => void;
 }) {
   return (
-    <Link className="nav-item" data-active={active ? "true" : undefined} href={href}>
+    <Link
+      className="nav-item"
+      data-active={active ? "true" : undefined}
+      href={href}
+      onClick={onNavigate}
+    >
       {icon}
       <span>{children}</span>
       {badge ? <span className="nav-soon">{badge}</span> : null}
     </Link>
+  );
+}
+
+// Mobile-only bottom tab bar (thumb-reachable) replacing the stacked sidebar.
+// Tabs are the four IA groups plus a "More" sheet that lists every module.
+function BottomTabBar({
+  view,
+  profile,
+  readiness,
+  statuses,
+}: {
+  view: AdmiraView;
+  profile: Profile;
+  readiness: number;
+  statuses: {
+    listBuilder: "checking" | "enabled" | "disabled";
+    studentsLikeYou: StudentsLikeYouStatus;
+    climb: ClimbStatus;
+    commandCenter: CommandCenterStatus;
+    copilot: CopilotStatus;
+    reports: ReportsStatus;
+    narrative: NarrativeStatus;
+    compass: CompassStatus;
+    fitFinder: FitFinderStatus;
+  };
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    if (!moreOpen) {
+      return;
+    }
+    function onKey(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMoreOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
+
+  const tabs: Array<{
+    href: string;
+    label: string;
+    icon: ReactNode;
+    active: boolean;
+  }> = [
+    {
+      href: "/dashboard",
+      label: "Overview",
+      icon: <BookOpen size={20} />,
+      active: view === "dashboard",
+    },
+    {
+      href: "/schools",
+      label: "Schools",
+      icon: <Search size={20} />,
+      active: view === "schools" || view === "start" || view === "fit",
+    },
+    {
+      href: "/list",
+      label: "List",
+      icon: <SlidersHorizontal size={20} />,
+      active:
+        view === "list" || view === "students-like-you" || view === "climb" ||
+        view === "command-center",
+    },
+    {
+      href: "/studio",
+      label: "Story",
+      icon: <FileText size={20} />,
+      active: view === "reports",
+    },
+  ];
+
+  return (
+    <>
+      <nav className="bottom-tabs" aria-label="Primary">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.href}
+            className="bottom-tab"
+            href={tab.href}
+            data-active={tab.active ? "true" : undefined}
+            aria-current={tab.active ? "page" : undefined}
+          >
+            {tab.icon}
+            <span>{tab.label}</span>
+          </Link>
+        ))}
+        <button
+          type="button"
+          className="bottom-tab"
+          data-active={moreOpen ? "true" : undefined}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen(true)}
+        >
+          <Menu size={20} />
+          <span>More</span>
+        </button>
+      </nav>
+
+      {moreOpen ? (
+        <div className="more-sheet-layer" role="presentation">
+          <button
+            type="button"
+            className="more-sheet-scrim"
+            aria-label="Close menu"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div className="more-sheet" role="dialog" aria-label="All modules" aria-modal="true">
+            <div className="more-sheet-handle" aria-hidden="true" />
+            <Link
+              className="profile-chip more-sheet-profile"
+              href="/start"
+              onClick={() => setMoreOpen(false)}
+            >
+              <div className="profile-avatar-mini" aria-hidden="true">
+                {profile.intendedMajor.trim().charAt(0).toUpperCase() || "A"}
+              </div>
+              <div>
+                <strong>Your profile</strong>
+                <span className="mono">{readiness}% ready</span>
+              </div>
+            </Link>
+            <div className="more-sheet-nav">
+              <div className="nav-grp">Overview</div>
+              <NavItem
+                href="/dashboard"
+                active={view === "dashboard"}
+                icon={<BookOpen size={17} />}
+                onNavigate={() => setMoreOpen(false)}
+              >
+                Dashboard
+              </NavItem>
+              <div className="nav-grp">Build</div>
+              <NavItem href="/start" active={view === "start"} icon={<GraduationCap size={17} />} onNavigate={() => setMoreOpen(false)}>
+                Profile Studio
+              </NavItem>
+              <NavItem href="/schools" active={view === "schools"} icon={<Search size={17} />} onNavigate={() => setMoreOpen(false)}>
+                School Universe
+              </NavItem>
+              {statuses.fitFinder === "enabled" ? (
+                <NavItem href="/fit" active={view === "fit"} icon={<Compass size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Fit Finder
+                </NavItem>
+              ) : null}
+              {statuses.listBuilder === "enabled" ? (
+                <NavItem href="/list" active={view === "list"} icon={<SlidersHorizontal size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Smart List
+                </NavItem>
+              ) : null}
+              <div className="nav-grp">Decide</div>
+              {statuses.studentsLikeYou === "enabled" ? (
+                <NavItem href="/students-like-you" active={view === "students-like-you"} icon={<CircleHelp size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Students Like You
+                </NavItem>
+              ) : null}
+              {statuses.climb === "enabled" ? (
+                <NavItem href="/climb" active={view === "climb"} icon={<Target size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Climb Roadmap
+                </NavItem>
+              ) : null}
+              {statuses.commandCenter === "enabled" ? (
+                <NavItem href="/command-center" active={view === "command-center"} icon={<ClipboardList size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Command Center
+                </NavItem>
+              ) : null}
+              <div className="nav-grp">Tell the story</div>
+              {statuses.narrative === "enabled" ? (
+                <NavItem href="/studio" active={false} icon={<FileText size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Narrative Studio
+                </NavItem>
+              ) : null}
+              {statuses.compass === "enabled" ? (
+                <NavItem href="/compass" active={false} icon={<Compass size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Major Compass
+                </NavItem>
+              ) : null}
+              {statuses.reports === "enabled" ? (
+                <NavItem href="/reports" active={view === "reports"} icon={<Share2 size={17} />} onNavigate={() => setMoreOpen(false)}>
+                  Reports
+                </NavItem>
+              ) : null}
+              <NavItem href="/money" active={view === "money"} icon={<FileText size={17} />} badge="Soon" onNavigate={() => setMoreOpen(false)}>
+                Money
+              </NavItem>
+              <div className="nav-grp">Account</div>
+              <NavItem href="/settings" active={view === "settings"} icon={<ShieldCheck size={17} />} onNavigate={() => setMoreOpen(false)}>
+                Account
+              </NavItem>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -2633,6 +2845,19 @@ function CopilotDrawer({
   schools: AddedSchool[];
   onClose: () => void;
 }) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKey(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   return (
     <div className="copilot-layer" data-open={open ? "true" : undefined}>
       <button

@@ -97,9 +97,9 @@ export function CompassExplorer() {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="compass-disabled">
         <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
-          ← Admira
+          ← Back to dashboard
         </Link>
-        <p className="mt-8 text-lg">Major/Career Compass is not currently open.</p>
+        <p className="mt-8 text-lg">Majors &amp; careers isn&apos;t available yet. Check back soon.</p>
       </main>
     );
   }
@@ -107,7 +107,7 @@ export function CompassExplorer() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-12 sm:py-16" data-testid="compass-explorer">
       <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
-        ← Admira
+        ← Back to dashboard
       </Link>
       <header className="mt-6">
         <div className="text-xs uppercase tracking-wide opacity-60">

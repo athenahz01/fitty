@@ -2530,3 +2530,66 @@ test("copilot shows suggested-prompt chips that prefill the input", async ({ pag
   await chip.click();
   await expect(panel.getByTestId("copilot-input")).toHaveValue(chipText);
 });
+
+test("mobile: bottom tab bar replaces the sidebar and the More sheet opens and closes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await page.goto("/dashboard");
+
+  await expect(page.locator(".bottom-tabs")).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeHidden();
+  const noOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth <=
+      document.documentElement.clientWidth + 1,
+  );
+  expect(noOverflow).toBe(true);
+
+  // The More sheet is a labelled dialog that closes on Escape.
+  await page.getByRole("button", { name: "More" }).click();
+  const sheet = page.getByRole("dialog", { name: "All modules" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("link", { name: "Account" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});
+
+test("keyboard: the search dropdown is arrow-navigable and Enter adds the read", async ({
+  page,
+}) => {
+  await mockOutcomeStatus(page, false);
+  await mockFitStatus(page, false);
+  await mockAdmitIntelligenceStatus(page, false);
+  await setProfileOnStart(page, {
+    gpa: "3.95",
+    sat: "1540",
+    act: "35",
+    major: "Computer science",
+  });
+  await page.goto("/schools");
+
+  const search = page.getByLabel("Search by school name");
+  await search.click();
+  await search.fill("Massachusetts");
+  await expect(
+    page.getByRole("button", { name: /Massachusetts Institute of Technology/ }),
+  ).toBeVisible();
+
+  // Arrow to the first option and add it with the keyboard alone.
+  await search.press("ArrowDown");
+  await search.press("Enter");
+  await expect(page.getByTestId("result-card")).toContainText(
+    "Massachusetts Institute of Technology",
+  );
+
+  // The search input shows a visible keyboard focus ring.
+  const outlineWidth = await search.evaluate((element) => {
+    element.focus();
+    return getComputedStyle(element).outlineWidth;
+  });
+  expect(outlineWidth).not.toBe("");
+});

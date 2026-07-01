@@ -151,9 +151,9 @@ export function EssayStudio() {
     return (
       <main className="mx-auto max-w-3xl px-6 py-24" data-testid="studio-disabled">
         <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
-          ← Admira
+          ← Back to dashboard
         </Link>
-        <p className="mt-8 text-lg">Narrative &amp; Essay Studio is not currently open.</p>
+        <p className="mt-8 text-lg">The Essay Studio isn&apos;t available yet. Check back soon.</p>
       </main>
     );
   }
@@ -161,7 +161,7 @@ export function EssayStudio() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-12 sm:py-16" data-testid="essay-studio">
       <Link href="/dashboard" className="text-sm opacity-60 hover:opacity-100">
-        ← Admira
+        ← Back to dashboard
       </Link>
       <header className="mt-6">
         <div className="text-xs uppercase tracking-wide opacity-60">

@@ -18,7 +18,9 @@
   --plain-card: #ffffff;
   --ink: #2a1f18;
   --muted: #6b5f54;
-  --faint: #9a938a;
+  /* Darkened for WCAG AA (>=4.5:1 on both warm-card and canvas); the pale
+     #9a938a failed on cream for small label/kicker text. */
+  --faint: #6a6459;
   --surface-soft: #f2eee7;
   --control-bg: #ece7de;
   --reach-wash: #fff6f1;
@@ -152,6 +154,13 @@ html {
   background: var(--canvas);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Baseline visible keyboard focus (oxide) on every interactive element. Low
+   specificity (:where) so components with their own focus ring still win. */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--chance-primary);
+  outline-offset: 2px;
 }
 
 body {
@@ -5667,11 +5676,141 @@ button {
   .toast,
   .text-control[data-shake="true"],
   .canada-fields,
-  .profile-more-body {
+  .profile-more-body,
+  .more-sheet,
+  .more-sheet-scrim {
     animation: none !important;
     transform: none !important;
     translate: none !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Mobile bottom tab bar + More sheet (Polish D) ─────────────────────────── */
+.bottom-tabs {
+  display: none;
+}
+
+.more-sheet-layer {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .bottom-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 2px;
+    background: color-mix(in srgb, var(--warm-card) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--rule);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-tab {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    min-height: 52px;
+    border: 0;
+    border-radius: var(--r-control);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-body), system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .bottom-tab[data-active="true"] {
+    background: var(--chance-wash);
+    color: var(--chance-ink);
+  }
+
+  .more-sheet-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    display: block;
+  }
+
+  .more-sheet-scrim {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--ink) 44%, transparent);
+    cursor: pointer;
+    animation: fade-in var(--motion-fast) var(--ease-out-quart) both;
+  }
+
+  .more-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 82vh;
+    overflow-y: auto;
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    background: var(--warm-card);
+    box-shadow: var(--rail-shadow);
+    padding: 10px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    animation: sheet-up var(--motion-medium) var(--ease-out-quart) both;
+  }
+
+  .more-sheet-handle {
+    width: 40px;
+    height: 4px;
+    margin: 4px auto 12px;
+    border-radius: 999px;
+    background: var(--rule-strong);
+  }
+
+  .more-sheet-profile {
+    margin: 0 0 6px;
+  }
+
+  .more-sheet-nav {
+    display: grid;
+    gap: 2px;
+  }
+
+  /* The stacked sidebar is replaced by the bottom tab bar on mobile. */
+  .sidebar {
+    display: none;
+  }
+
+  .product-shell {
+    grid-template-columns: 1fr;
+  }
+
+  /* Keep content clear of the fixed bottom bar. */
+  .admira-app-shell {
+    padding-bottom: 84px;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 
